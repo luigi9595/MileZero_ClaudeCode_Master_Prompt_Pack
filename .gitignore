@@ -1,0 +1,30 @@
+# Unreal Engine 5
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.sln
+*.suo
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# OS
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# Compiled assets (binary)
+*.uasset
+*.umap
+
+# Crashpad
+CrashReportClient/
+
+# Local settings that shouldn't be shared
+.claude/settings.local.json

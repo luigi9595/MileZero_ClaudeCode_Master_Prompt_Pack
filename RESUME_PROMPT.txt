@@ -1,0 +1,24 @@
+Resume from project memory.
+
+Read:
+- CLAUDE.md
+- docs/STATE.md
+- docs/TODO.md
+- docs/DECISIONS.md
+- docs/ROADMAP_EXECUTION.md
+- docs/MILESTONE_STATUS.md
+- docs/VERIFICATION.md
+- docs/TEST_MATRIX.md
+- docs/RISK_REGISTER.md
+
+Inspect the repository and reconcile any drift between docs and code.
+Determine the current milestone and the next unchecked verification gate.
+Advance that gate immediately, verify it, update the docs, and continue until meaningful progress is made.
+
+Reply only with:
+1. CURRENT MILESTONE
+2. ADVANCED GATE
+3. WHAT CHANGED
+4. WHAT I VERIFIED
+5. BLOCKER / RISK
+6. NEXT ACTION

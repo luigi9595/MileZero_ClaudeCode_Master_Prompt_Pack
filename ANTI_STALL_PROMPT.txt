@@ -1,0 +1,23 @@
+Stop explaining and advance the roadmap.
+
+Read CLAUDE.md and all roadmap/state docs.
+Identify the current milestone.
+Identify the next unchecked verification gate.
+Execute that gate now.
+Run verification.
+Update:
+- docs/STATE.md
+- docs/TODO.md
+- docs/MILESTONE_STATUS.md
+- docs/VERIFICATION.md
+- docs/RISK_REGISTER.md
+
+Then reply only with:
+1. CURRENT MILESTONE
+2. ADVANCED GATE
+3. WHAT CHANGED
+4. WHAT I VERIFIED
+5. BLOCKER / RISK
+6. NEXT ACTION
+
+No more design-only output.
