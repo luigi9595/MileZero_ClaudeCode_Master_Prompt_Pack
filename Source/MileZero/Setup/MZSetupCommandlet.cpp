@@ -12,6 +12,8 @@
 #include "Components/SkyLightComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Engine/ExponentialHeightFog.h"
+#include "Lightmass/LightmassImportanceVolume.h"
+#include "Components/BrushComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -153,6 +155,18 @@ bool UMZSetupCommandlet::CreateTestLevel()
 			Fog->GetComponent()->SetFogDensity(0.01f);
 			Fog->GetComponent()->SetFogHeightFalloff(0.2f);
 			UE_LOG(LogMileZero, Display, TEXT("  + Exponential height fog"));
+		}
+	}
+
+	// --- Lightmass Importance Volume ---
+	{
+		ALightmassImportanceVolume* LIV = World->SpawnActor<ALightmassImportanceVolume>(FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+		if (LIV)
+		{
+			// Cover the driving area: 200m x 200m x 20m (floor is 200-scale plane = 20000x20000 UU)
+			LIV->SetActorLabel(TEXT("LightmassImportanceVolume"));
+			LIV->SetActorScale3D(FVector(400.0f, 400.0f, 40.0f));
+			UE_LOG(LogMileZero, Display, TEXT("  + Lightmass Importance Volume"));
 		}
 	}
 
