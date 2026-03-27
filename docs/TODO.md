@@ -6,9 +6,8 @@
 - [x] ~~input actions~~ auto-bootstrap at runtime (no editor assets needed)
 - [x] ~~test level~~ L_MZ_TestTrack.umap created via MZSetup commandlet
 - [x] ~~vehicle template content~~ OffroadCar + SportsCar copied to Content/Vehicles/
-- [ ] create `BP_MZVehicle_Hatch` Blueprint (assign mesh + wheel setups)
-- [ ] set GameMode default pawn to Blueprint
-- [ ] PIE test: throttle, brake, steer, handbrake, camera, reset
+- [x] ~~vehicle mesh + wheels~~ auto-configured in C++ constructor (SKM_Offroad + MZWheelFront/Rear)
+- [ ] **PIE test**: open editor (`tools\open_editor.bat`), press Alt+P, verify driving
 
 ## Next (after M0+M1 verified)
 - [ ] wire UMZSurfaceContactComponent to vehicle pawn

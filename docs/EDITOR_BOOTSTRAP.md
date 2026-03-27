@@ -23,7 +23,8 @@ Exact step-by-step procedure to get from "toolchain installed" to "first drivabl
 - Chase camera + hood camera cycling
 
 ## What still needs editor work
-- **Vehicle skeletal mesh**: Chaos vehicle requires a skeletal mesh with wheel bones (KI-005)
+- **Nothing critical** — vehicle auto-loads SKM_Offroad mesh + configures 4 wheels in C++ constructor
+- **If mesh fails to load**: add Vehicle content pack from editor ("Add Feature or Content Pack" > Vehicle)
 
 ---
 
@@ -33,35 +34,7 @@ tools\open_editor.bat
 ```
 Or double-click `MileZero.uproject`. First launch compiles shaders — wait for it to finish.
 
-## Step 2: Add vehicle content to the project
-In the editor: **Edit > Plugins**, search for and enable:
-- **ChaosVehiclesPlugin** (should already be enabled)
-
-Then add vehicle template content:
-1. **Content Drawer** > **Add/Import** > **Add Feature or Content Pack**
-2. Select the **Vehicle** template content
-3. This adds skeletal meshes with proper wheel bones
-
-Alternatively, the vehicle content from the template has been pre-copied to `Content/Vehicles/OffroadCar/` and `Content/Vehicles/SportsCar/`. If references work, use `SKM_Offroad` or `SKM_SportsCar` directly.
-
-## Step 3: Create a vehicle Blueprint
-1. In Content Browser, go to `Content/MileZero/Blueprints/Vehicles/`
-2. Right-click > Blueprint Class > search `MZVehiclePawn` > Create
-3. Name: `BP_MZVehicle_Hatch`
-4. Open the Blueprint, select the **Mesh** component (inherited from WheeledVehiclePawn)
-5. In Details, set **Skeletal Mesh** to `SKM_Offroad` (or `SKM_SportsCar`)
-6. Configure the **ChaosWheeledVehicleMovementComponent**:
-   - Set up 4 wheels (FL, FR, RL, RR) matching the skeleton bones
-   - Front wheels: `Wheel_Front_Left`, `Wheel_Front_Right`
-   - Rear wheels: `Wheel_Rear_Left`, `Wheel_Rear_Right`
-7. Compile and Save the Blueprint
-
-## Step 4: Set GameMode to use the Blueprint pawn
-Option A (per-level): In the test level's **World Settings** > **GameMode Override** > set **Default Pawn Class** to `BP_MZVehicle_Hatch`
-
-Option B (global): In **Project Settings > Maps & Modes > Default Pawn Class**, set to `BP_MZVehicle_Hatch`
-
-## Step 5: PIE test
+## Step 2: PIE test (no Blueprint needed — fully self-configuring in C++)
 1. Open `L_MZ_TestTrack` (should auto-load)
 2. Press **Alt+P** (Play In Editor)
 3. Verify:
