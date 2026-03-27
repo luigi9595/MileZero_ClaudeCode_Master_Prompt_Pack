@@ -1,76 +1,112 @@
 # ARCHITECTURE
 
-## High-level modules
-- Core — game mode, player controller, game instance
-- Data — UPrimaryDataAsset subclasses for vehicles, surfaces, activities
-- Input — Enhanced Input contexts and actions (editor assets)
-- Characters — on-foot player character (AMZCharacter)
-- Vehicles — vehicle pawn, vehicle data, damage component
-- Traffic — traffic subsystem, traffic vehicles (M7)
-- Activities — activity manager, activity data assets (M6)
-- World — world partition, data layers (M5)
-- UI — HUD, telemetry, pause menu, main menu widgets (M6)
-- Debug — debug subsystem, console commands, telemetry toggle
-- Save — save game class, persistence (M6)
+## Source Tree (72 files)
 
-## Architectural principles
-- C++ first for core gameplay systems
-- Blueprints only where composition speed matters and logic remains understandable
-- Data-driven tuning for vehicles, surfaces, damage, activities, and traffic
-- Milestone-based implementation with verification gates
-- Avoid magic numbers and scattered tuning
-
-## Source tree (current)
 ```
-Source/
-  MileZero.Target.cs
-  MileZeroEditor.Target.cs
-  MileZero/
-    MileZero.Build.cs
-    MileZero.h / .cpp                       — module definition + log category
-    Core/
-      MZGameMode.h / .cpp                   — game mode, default pawn spawn
-      MZPlayerController.h / .cpp           — input context switching, vehicle enter/exit stubs
-      MZGameInstance.h / .cpp               — persistent game state, vehicle selection
-    Characters/
-      MZCharacter.h / .cpp                  — third-person on-foot character
-    Vehicles/
-      MZVehiclePawn.h / .cpp                — Chaos wheeled vehicle, input, camera, reset, telemetry
-      MZVehicleDataAsset.h                  — UPrimaryDataAsset for vehicle specs
-    Surfaces/
-      MZSurfaceDataAsset.h                  — UPrimaryDataAsset for surface profiles
-      MZSurfaceContactComponent.h / .cpp    — runtime surface detection
-    Debug/
-      MZDebugSubsystem.h / .cpp             — console commands, telemetry toggle
-    Save/
-      MZSaveGame.h / .cpp                   — USaveGame subclass
-    Activities/
-      MZActivityDataAsset.h                 — UPrimaryDataAsset for activity definitions
-```
-
-## Content tree (planned)
-```
-Content/MileZero/
-  Maps/Boot/         — L_MZ_Boot
-  Maps/Frontend/     — L_MZ_Frontend
-  Maps/Test/         — L_MZ_TestTrack
-  Maps/World/        — L_MZ_MainWorld
-  Input/             — IMC_MZ_OnFoot, IMC_MZ_Drive, IMC_MZ_UI, IA_MZ_*
-  Data/Vehicles/     — DA_MZVehicle_Coupe, _Hatch, _Pickup
-  Data/Surfaces/     — DA_MZSurface_DryAsphalt, _WetAsphalt, _Gravel, _Grass
-  Data/Activities/   — DA_MZActivity_*
-  UI/                — WBP_MZHUD, WBP_MZPauseMenu, WBP_MZMainMenu, WBP_MZTelemetry
-  Meshes/Vehicles/   — skeletal meshes
-  Meshes/World/      — world geometry
-  Materials/         — surface materials, vehicle materials
-  Blueprints/Vehicles/ — BP wrappers if needed
+Source/MileZero/
+├── MileZero.h/.cpp/.Build.cs     — Module definition, log category
+├── Core/
+│   ├── MZGameMode.h/.cpp         — Game mode, vehicle spawn via registry
+│   ├── MZPlayerController.h/.cpp — Input context management
+│   └── MZGameInstance.h/.cpp     — Persistent state, SelectedVehicleID
+├── Characters/
+│   └── MZCharacter.h/.cpp        — On-foot character (stubbed for post-v1)
+├── Vehicles/
+│   ├── MZVehiclePawn.h/.cpp      — CORE: Chaos vehicle, input, camera, surface+damage wiring
+│   ├── MZVehicleDataAsset.h      — Data asset: mass, engine, gears, suspension, steering
+│   ├── MZVehicleRegistry.h/.cpp  — Subsystem: creates 3 vehicle profiles at runtime
+│   ├── MZWheelFront.h/.cpp       — Front wheel defaults
+│   └── MZWheelRear.h/.cpp        — Rear wheel defaults
+├── Surfaces/
+│   ├── MZSurfaceDataAsset.h      — Grip, rolling resistance, roughness
+│   └── MZSurfaceContactComponent.h/.cpp — Line trace surface detection
+├── Damage/
+│   ├── MZDamageTypes.h           — EMZImpactSeverity, FMZDamageState
+│   ├── MZDamageDataAsset.h       — Impact thresholds, max damage values
+│   └── MZVehicleDamageComponent.h/.cpp — 8 damage subsystems, overheat, per-wheel
+├── UI/
+│   ├── MZHUD.h/.cpp              — AHUD lifecycle manager
+│   ├── MZHUDWidget.h/.cpp        — Gameplay HUD (Slate): speed, RPM, gear, damage
+│   └── MZTelemetryWidget.h/.cpp  — Debug overlay (Slate): full telemetry, FPS, grip color
+├── Activities/
+│   ├── MZActivityDataAsset.h     — Activity definition (4 types)
+│   ├── MZActivityHUDData.h       — HUD data struct for activity state
+│   ├── MZActivityManager.h/.cpp  — Subsystem: activity lifecycle state machine
+│   ├── MZCheckpointActor.h/.cpp  — Trigger volumes for checkpoint sprint
+│   └── MZDeliveryPickup.h/.cpp   — Pickup/dropoff points for delivery run
+├── Save/
+│   ├── MZSaveGame.h/.cpp         — Save data: vehicle, transform, activities, settings
+│   └── MZSaveManager.h/.cpp      — Subsystem: save/load/autosave
+├── Debug/
+│   ├── MZDebugSubsystem.h/.cpp   — Console commands: MZ.*, vehicle spawn, telemetry toggle
+│   └── UI/MZVehicleSelectionWidget.h/.cpp — Dev vehicle picker (Slate)
+├── Setup/
+│   └── MZSetupCommandlet.h/.cpp  — Auto-generates test level + main world
+├── Traffic/
+│   ├── MZTrafficPath.h/.cpp      — Spline-based traffic routes
+│   ├── MZTrafficVehicle.h/.cpp   — Simple AI vehicle (APawn + path following)
+│   └── MZTrafficSubsystem.h/.cpp — World subsystem: spawn/despawn loop
+└── World/
+    ├── MZWorldZoneTypes.h        — EMZZoneType enum
+    ├── MZWorldZone.h/.cpp        — Zone actor with bounds + overlap detection
+    ├── MZSpawnPoint.h/.cpp       — Spawn/recovery point actors
+    ├── MZWorldManager.h/.cpp     — World subsystem: zone tracking, spawn queries
+    ├── MZRouteMarker.h/.cpp      — Route waypoint actors
+    ├── MZTimeOfDayManager.h/.cpp — Sun rotation, intensity, color blending
+    ├── MZWeatherTypes.h          — EMZWeatherState enum
+    └── MZWeatherManager.h/.cpp   — Wetness factor, grip modifier
 ```
 
-## Key class relationships
-- AMZGameMode sets DefaultPawnClass to AMZVehiclePawn (M1 fallback)
-- AMZPlayerController manages Enhanced Input context switching
-- AMZVehiclePawn owns USpringArmComponent + UCameraComponent (chase/hood)
-- AMZVehiclePawn reads UMZVehicleDataAsset for tuning
-- UMZSurfaceContactComponent traces ground and resolves UMZSurfaceDataAsset
-- UMZDebugSubsystem provides exec console commands
-- UMZSaveGame stores player state
+## Key Data Flow
+
+### Vehicle Tick (every frame)
+```
+MZVehiclePawn::Tick()
+  → SurfaceContactComponent.GetCurrentGripMultiplier()     // base grip from surface
+  → DamageComponent.GetWheelGripMultiplier(i)               // per-wheel damage penalty
+  → SetWheelFrictionMultiplier(i, baseGrip * damageGrip)   // applied to Chaos wheels
+  → ApplyDamageEffects()
+      → throttle scaled by PowerMultiplier + OverheatFactor
+      → brake scaled by BrakeMultiplier
+      → steering offset by SteeringPullDegrees
+```
+
+### Collision → Damage Flow
+```
+OnActorHit → DamageComponent.ProcessImpact(speedKmh, normal, point)
+  → CalculateSeverity (Light/Medium/Heavy from speed thresholds)
+  → ApplyDamageToSubsystems (direction-aware distribution)
+      Front hit → engine, cooling, front suspension, aero
+      Side hit  → steering, near-side wheels/suspension
+      Rear hit  → rear suspension, aero
+```
+
+### Vehicle Spawn Flow
+```
+GameMode.SpawnDefaultPawnAtTransform()
+  → GameInstance.SelectedVehicleID
+  → VehicleRegistry.GetVehicleData(ID)
+  → SpawnActor<AMZVehiclePawn>()
+  → Vehicle.ApplyVehicleData(data)  // mass, engine, gears, steering, drag
+  → Controller.Possess(vehicle)
+```
+
+### Activity Flow
+```
+ActivityManager.StartActivity(data)
+  → state = Starting → Active
+  → CheckpointActor.OnOverlapBegin → ActivityManager.OnCheckpointReached()
+  → Timer tick → check time limit
+  → CompleteActivity() / FailActivity()
+  → SaveManager.AutoSave()  // persist best times
+```
+
+## Subsystems (auto-initialized)
+| Subsystem | Scope | Purpose |
+|-----------|-------|---------|
+| UMZVehicleRegistry | GameInstance | Vehicle data management |
+| UMZActivityManager | GameInstance | Activity lifecycle |
+| UMZSaveManager | GameInstance | Save/load/autosave |
+| UMZDebugSubsystem | GameInstance | Console commands, dev tools |
+| UMZTrafficSubsystem | World | Traffic AI management |
+| UMZWorldManager | World | Zone tracking, spawn queries |

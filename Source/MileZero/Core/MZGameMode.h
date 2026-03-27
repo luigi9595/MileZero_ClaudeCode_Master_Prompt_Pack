@@ -4,6 +4,9 @@
 #include "GameFramework/GameModeBase.h"
 #include "MZGameMode.generated.h"
 
+class AMZHUD;
+class UMZGameInstance;
+
 UCLASS()
 class MILEZERO_API AMZGameMode : public AGameModeBase
 {

@@ -1,0 +1,131 @@
+M3: VEHICLE TRIO DIFFERENTIATION — QUICK REFERENCE
+
+IMPLEMENTATION COMPLETE
+========================
+
+Created Files (4 source, 2 docs):
+  /Source/MileZero/Vehicles/MZVehicleRegistry.h
+  /Source/MileZero/Vehicles/MZVehicleRegistry.cpp
+  /Source/MileZero/Debug/UI/MZVehicleSelectionWidget.h
+  /Source/MileZero/Debug/UI/MZVehicleSelectionWidget.cpp
+  /docs/M3_IMPLEMENTATION_SUMMARY.md
+  /docs/M3_FILES_MANIFEST.md
+
+Modified Files (4 source, 4 docs):
+  /Source/MileZero/Core/MZGameMode.h/.cpp
+  /Source/MileZero/Debug/MZDebugSubsystem.h/.cpp
+  /docs/MILESTONE_STATUS.md
+  /docs/TODO.md
+  /docs/STATE.md
+  /docs/VERIFICATION.md (pending)
+
+VEHICLE SPECS
+=============
+
+COUPE (RWD, 1300 kg) — Agile, rotation-friendly
+  Engine: 400 Nm @ 7000 RPM
+  Springs: 32000 N/m (front), 30000 N/m (rear)
+  MaxSteerAngle: 32° | Drag: 0.32
+  Gears: [3.8, 2.2, 1.5, 1.1, 0.85, 0.68] | Final: 3.7
+  Brakes: 4000 Nm max, 0.65 front bias
+
+HATCHBACK (FWD, 1150 kg) — Stable, forgiving
+  Engine: 280 Nm @ 6500 RPM
+  Springs: 25000 N/m (front), 24000 N/m (rear)
+  MaxSteerAngle: 38° | Drag: 0.35
+  Gears: [3.5, 2.0, 1.35, 1.0, 0.82] | Final: 3.9
+  Brakes: 3500 Nm max, 0.60 front bias
+
+PICKUP/SUV (AWD, 2000 kg) — Heavy, slow transitions
+  Engine: 500 Nm @ 5500 RPM
+  Springs: 18000 N/m (front), 17500 N/m (rear)
+  MaxSteerAngle: 30° | Drag: 0.42
+  Gears: [4.0, 2.3, 1.5, 1.0, 0.75] | Final: 4.1
+  Brakes: 4500 Nm max, 0.55 front bias
+
+CONSOLE COMMANDS
+================
+  MZ.ListVehicles         — Print all registered vehicles with stats
+  MZ.SelectVehicle        — Toggle vehicle selection widget (3 buttons)
+  MZ.SpawnVehicle <ID>    — Spawn vehicle (Coupe, Hatch, Pickup)
+  MZ.ResetVehicle         — Reset vehicle to spawn point
+  MZ.Telemetry            — Toggle telemetry overlay
+  MZ.Teleport X Y Z       — Teleport player to coordinates
+
+ARCHITECTURE
+============
+
+MZVehicleRegistry (GameInstanceSubsystem)
+  ├─ CreateDefaultVehicles()
+  │  ├─ CreateCoupeData()
+  │  ├─ CreateHatchData()
+  │  └─ CreatePickupData()
+  ├─ GetVehicleData(FName ID) → UMZVehicleDataAsset*
+  ├─ GetAllVehicleIDs() → TArray<FName>
+  └─ GetDefaultVehicleID() → FName("Hatch")
+
+MZGameMode::SpawnDefaultPawnAtTransform_Implementation()
+  ├─ Get SelectedVehicleID from UMZGameInstance
+  ├─ Look up UMZVehicleDataAsset from registry
+  ├─ Spawn AMZVehiclePawn
+  ├─ Call ApplyVehicleData()
+  └─ Possess vehicle
+
+MZDebugSubsystem
+  ├─ SpawnVehicleByID(FString ID)
+  │  ├─ Get current vehicle location
+  │  ├─ Destroy old vehicle
+  │  ├─ Spawn new vehicle at same location
+  │  ├─ Apply vehicle data
+  │  └─ Possess new vehicle
+  ├─ ToggleVehicleSelectionWidget()
+  └─ Registered console commands (MZ.*)
+
+SMZVehicleSelectionWidget (Slate)
+  ├─ Button: COUPE
+  ├─ Button: HATCHBACK
+  └─ Button: PICKUP/SUV
+    → Each calls SpawnVehicleByID()
+
+NEXT STEPS
+==========
+1. Compile: Build.bat MileZeroEditor Win64 Development
+2. If compile succeeds:
+   - Open editor
+   - Load L_MZ_TestTrack
+   - PIE test (Alt+P)
+3. Test vehicle spawning:
+   - MZ.SpawnVehicle Coupe
+   - MZ.SpawnVehicle Hatch
+   - MZ.SpawnVehicle Pickup
+4. Verify handling differences:
+   - Coupe: quick steering, stiff suspension, agile
+   - Hatchback: moderate steering, balanced, forgiving
+   - Pickup: slow steering, soft suspension, heavy roll
+5. Log verification:
+   - MZ.ListVehicles (check output in log)
+
+DESIGN DECISIONS
+================
+
+Vehicle Differentiation:
+  - Each vehicle tuned for distinct feel via suspension springs
+  - Coupe: 32000 N/m (stiff) → responsive, rotation-friendly
+  - Hatchback: 25000 N/m (moderate) → balanced, stable
+  - Pickup: 18000 N/m (soft) → slow transitions, body roll
+
+Drivetrain Choices:
+  - RWD Coupe: high final drive (3.7) for rotation bias
+  - FWD Hatchback: softer rear springs for understeer tendency
+  - AWD Pickup: balanced springs for traction
+
+Spring Rates Reflect Physics:
+  - Lighter vehicle (Coupe) can use stiffer springs without harsh feel
+  - Heavier vehicle (Pickup) needs softer springs for suspension compliance
+  - Each suspension tuned to characteristic handling type
+
+All Specs Programmatic:
+  - No editor assets needed during development
+  - Registry creates data via NewObject<> in Initialize()
+  - Easy to add 4th vehicle: duplicate creation function + add to map
+  - Rapid iteration: change specs, recompile, test

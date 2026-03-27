@@ -1,0 +1,253 @@
+================================================================================
+M6 IMPLEMENTATION SUMMARY: Activity Manager and Enhanced Save/Load
+================================================================================
+
+PROJECT: MileZero
+ENGINE: UE5.7
+MODULE: MileZero (C++)
+DATE: 2026-03-27
+
+================================================================================
+DELIVERABLES
+================================================================================
+
+1. ACTIVITY HUD DATA STRUCT
+   File: Source/MileZero/Activities/MZActivityHUDData.h
+   Type: USTRUCT (Blueprint-compatible)
+   Purpose: Data structure for passing activity state to HUD widgets
+   Fields: ObjectiveText, ElapsedTime, TimeLimit, CurrentCheckpoint, 
+           TotalCheckpoints, DamagePercent, ActivityType, bIsActive
+
+2. CHECKPOINT ACTOR
+   Files: Source/MileZero/Activities/MZCheckpointActor.h/.cpp
+   Type: AActor with subsystem integration
+   Purpose: Checkpoint trigger volumes for activities
+   Components: UBoxComponent (TriggerVolume), UStaticMeshComponent (Visual)
+   Delegate: OnCheckpointReached(int32 Index, bool bIsFinish)
+   Features:
+   - Overlap detection via UBoxComponent
+   - Visual state management (green/grey/red)
+   - Reachability tracking
+
+3. DELIVERY PICKUP ACTOR
+   Files: Source/MileZero/Activities/MZDeliveryPickup.h/.cpp
+   Type: AActor with subsystem integration
+   Purpose: Delivery start/end points for activities
+   Components: UBoxComponent (PickupZone), UStaticMeshComponent (Visual)
+   Delegate: OnDeliveryInteraction(FName DeliveryID, bool bPickedUp)
+   Features:
+   - Pickup/dropoff zone management
+   - Active/inactive state control
+   - Visual color feedback
+
+4. ACTIVITY MANAGER (SUBSYSTEM)
+   Files: Source/MileZero/Activities/MZActivityManager.h/.cpp
+   Type: UGameInstanceSubsystem
+   Purpose: Central activity lifecycle and progression management
+   State Machine: Inactive → Starting → Active → (Completed|Failed)
+   Activity Types: CheckpointSprint, DeliveryRun, TrafficWeave, DamageSurvival
+   
+   Key Methods:
+   - StartActivity(UMZActivityDataAsset*)
+   - CompleteActivity()
+   - FailActivity(FString Reason)
+   - OnCheckpointReached(int32, bool)
+   - OnDeliveryPickedUp/DroppedOff(FName)
+   - UpdateAccumulatedDamage(float)
+   - IncrementTrafficVehiclesPassed()
+   
+   Key Delegates:
+   - OnActivityStateChanged(State, Message, Success)
+   - OnActivityProgressUpdated(FMZActivityHUDData)
+   
+   Features:
+   - Time tracking and timeout handling
+   - Checkpoint progression management
+   - Delivery point state control
+   - Damage accumulation with limits
+   - Best time recording
+   - Objective text generation
+   - HUD data aggregation
+
+5. SAVE/LOAD SYSTEM
+
+   5a. Enhanced Save Game Object
+       File: Source/MileZero/Save/MZSaveGame.h (MODIFIED)
+       Type: USaveGame subclass
+       New Fields:
+       - BestTimes: TMap<FName, float> (activity records)
+       - TotalPlayTimeSeconds: float
+       - CurrentMapName: FString
+       - DamageState: FMZDamageState
+       - PlayerSettings: FMZPlayerSettings struct
+       
+       New Struct: FMZPlayerSettings
+       - MusicVolume, SFXVolume: float
+       - bShowTelemetry: bool
+
+   5b. Save Manager (SUBSYSTEM)
+       Files: Source/MileZero/Save/MZSaveManager.h/.cpp
+       Type: UGameInstanceSubsystem
+       Purpose: Persistent data management and autosave system
+       
+       Key Methods:
+       - SaveGame(SlotName)
+       - LoadGame(SlotName)
+       - AutoSave()
+       - HasSaveData(SlotName)
+       - DeleteSave(SlotName)
+       - UpdatePlaytime(DeltaTime)
+       
+       Key Delegate:
+       - OnSaveStateChanged(Success, Message)
+       
+       Features:
+       - Disk I/O via UGameplayStatics
+       - State capture (world context)
+       - State application (world context)
+       - Autosave at 60-second intervals
+       - Slot management
+
+================================================================================
+ARCHITECTURE HIGHLIGHTS
+================================================================================
+
+SUBSYSTEM INTEGRATION:
+- Both managers are GameInstanceSubsystems
+- Initialize during UGameInstance::Init()
+- Tick via game mode or explicit tick calls
+- Delegates broadcast to UI/gameplay code
+
+ACTIVITY FLOW:
+1. StartActivity() creates activity state
+2. Setup methods (SetupCheckpointSprint, etc.) find/configure actors
+3. TickActivity() updates timers and checks conditions
+4. Callbacks (OnCheckpointReached, OnDeliveryPickedUp) update progression
+5. CompleteActivity/FailActivity() end activity and record results
+6. ClearActivityState() cleans up delegates and actors
+
+CHECKPOINT SPRINT:
+1. All checkpoints found and sorted by index
+2. First checkpoint marked as reachable
+3. Player reaches checkpoint → next becomes reachable
+4. Final checkpoint marked with bIsFinish → triggers completion
+
+DELIVERY RUN:
+1. All pickup/dropoff points found
+2. Pickups enabled, dropoffs disabled initially
+3. Pickup entered → cargo picked up, dropoffs enabled
+4. Dropoff entered → activity completes
+5. Time limit checked throughout
+
+TRAFFIC WEAVE:
+1. Simple counter (IncrementTrafficVehiclesPassed)
+2. Called by vehicle system when pass detected
+3. Time limit runs in background
+4. Activity remains active until completion externally
+
+DAMAGE SURVIVAL:
+1. UpdateAccumulatedDamage() called by vehicle system
+2. If exceeds MaxDamageAllowed → auto-fails
+3. Time limit runs in background
+4. Activity remains active until time runs out
+
+SAVE/LOAD:
+1. UpdatePlaytime() accumulates time
+2. At 60-second interval, CaptureGameState() and save
+3. LoadGame() captures then ApplyGameState()
+4. BestTimes persists across sessions
+
+================================================================================
+CODE STATISTICS
+================================================================================
+
+Activity System:
+- MZActivityHUDData.h:         34 lines
+- MZCheckpointActor.h:        99 lines
+- MZCheckpointActor.cpp:      93 lines
+- MZDeliveryPickup.h:         84 lines
+- MZDeliveryPickup.cpp:       77 lines
+- MZActivityManager.h:       302 lines
+- MZActivityManager.cpp:     462 lines
+                            ─────────
+                            1,151 lines
+
+Save/Load System:
+- MZSaveGame.h (enhanced):    67 lines
+- MZSaveManager.h:          121 lines
+- MZSaveManager.cpp:        207 lines
+                            ─────────
+                             395 lines
+
+Documentation:
+- M6_IMPLEMENTATION_NOTES.md
+- M6_FILES_MANIFEST.md
+- M6_CODE_SUMMARY.txt
+
+TOTAL CODE: ~1,550 lines
+
+================================================================================
+INTEGRATION CHECKLIST
+================================================================================
+
+FROM GAME MODE:
+☐ Initialize both subsystems via GameInstance
+☐ Call SaveManager->UpdatePlaytime(DeltaTime) in Tick()
+
+FROM VEHICLE SYSTEM:
+☐ Call ActivityManager->UpdateAccumulatedDamage(Amount) on damage
+☐ Call ActivityManager->SetDamageFromState(DamageState) post-damage-calc
+☐ Call ActivityManager->IncrementTrafficVehiclesPassed() on traffic pass
+
+FROM HUD/UI:
+☐ Bind widgets to ActivityManager->OnActivityProgressUpdated
+☐ Display HUDData from GetHUDData()
+☐ Show best times from GetBestTime()
+
+FROM LEVEL DESIGN:
+☐ Place AMZCheckpointActor instances, set CheckpointIndex/bIsStart/bIsFinish
+☐ Place AMZDeliveryPickup instances, set DeliveryID/bIsPickup
+
+OPTIONAL:
+☐ Link PlayerSettings to audio volume system
+☐ Link bShowTelemetry to debug display system
+
+================================================================================
+VERIFICATION GATES
+================================================================================
+
+COMPILATION:
+✓ All .h files have #pragma once
+✓ All .h files have GENERATED_BODY()
+✓ All .cpp files include "MileZero.h"
+✓ All UClasses exported with MILEZERO_API
+✓ All UDelegates marked DYNAMIC_MULTICAST_DELEGATE
+✓ All TMap/TArray properly templated
+
+FUNCTIONALITY:
+☐ Checkpoint reachability updates on progression
+☐ Delivery dropoffs disabled until pickup
+☐ Time limits trigger failure correctly
+☐ Best times stored and retrieved correctly
+☐ Autosave triggers at 60-second interval
+☐ Player transform saved/restored correctly
+☐ Activity state broadcasts on transition
+☐ HUD data updates with progress
+
+INTEGRATION:
+☐ Subsystems initialize without errors
+☐ Delegates bind/unbind correctly
+☐ Actor iteration finds checkpoints/deliveries
+☐ Save/load cycle preserves all data
+
+================================================================================
+NOTES FOR M7+
+================================================================================
+
+- Activity Manager can be extended with new EMZActivityType values
+- Each new activity type requires Setup, CheckCompletion, GetObjectiveText
+- Save Manager ApplyGameState() should be enhanced for map-specific recovery
+- Consider adding activity difficulty levels (Easy, Normal, Hard)
+- Consider adding leaderboard integration for best times
+- Consider checkpoint "reset" functionality for failed attempts
+

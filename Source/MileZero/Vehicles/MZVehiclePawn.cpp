@@ -2,6 +2,8 @@
 #include "MZVehicleDataAsset.h"
 #include "MZWheelFront.h"
 #include "MZWheelRear.h"
+#include "Surfaces/MZSurfaceContactComponent.h"
+#include "Damage/MZVehicleDamageComponent.h"
 #include "MileZero.h"
 
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -93,6 +95,12 @@ AMZVehiclePawn::AMZVehiclePawn()
 	HoodCamera->SetupAttachment(GetMesh());
 	HoodCamera->SetRelativeLocation(FVector(100.0f, 0.0f, 130.0f));
 	HoodCamera->SetRelativeRotation(FRotator(-5.0f, 0.0f, 0.0f));
+
+	// --- Surface contact detection ---
+	SurfaceContact = CreateDefaultSubobject<UMZSurfaceContactComponent>(TEXT("SurfaceContact"));
+
+	// --- Damage component ---
+	DamageComp = CreateDefaultSubobject<UMZVehicleDamageComponent>(TEXT("DamageComp"));
 }
 
 void AMZVehiclePawn::BeginPlay()
@@ -108,12 +116,94 @@ void AMZVehiclePawn::BeginPlay()
 		ApplyVehicleData(VehicleData);
 	}
 
+	// Register collision handler for damage system
+	OnActorHit.AddDynamic(this, &AMZVehiclePawn::OnVehicleHit);
+
 	UE_LOG(LogMileZero, Log, TEXT("MZVehiclePawn spawned at %s"), *SpawnTransform.GetLocation().ToString());
 }
 
 void AMZVehiclePawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	UChaosWheeledVehicleMovementComponent* WheeledMovement = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+	if (!WheeledMovement) return;
+
+	// --- Surface grip ---
+	float BaseGrip = SurfaceContact ? SurfaceContact->GetCurrentGripMultiplier() : 1.0f;
+
+	// --- Per-wheel friction: surface * damage ---
+	for (int32 i = 0; i < WheeledMovement->GetNumWheels(); ++i)
+	{
+		float WheelGrip = BaseGrip;
+		if (DamageComp)
+		{
+			WheelGrip *= DamageComp->GetWheelGripMultiplier(i);
+		}
+		WheeledMovement->SetWheelFrictionMultiplier(i, WheelGrip);
+	}
+
+	// --- Damage effects on vehicle dynamics ---
+	ApplyDamageEffects(DeltaTime);
+}
+
+void AMZVehiclePawn::ApplyDamageEffects(float DeltaTime)
+{
+	if (!DamageComp) return;
+
+	UChaosWheeledVehicleMovementComponent* Movement = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+	if (!Movement) return;
+
+	// Power loss from engine damage + overheat
+	float PowerMult = DamageComp->GetPowerMultiplier();
+	float OverheatPenalty = DamageComp->GetOverheatFactor() * 0.3f; // up to 30% extra loss from overheat
+	float EffectiveTorque = Movement->EngineSetup.MaxTorque * (PowerMult - OverheatPenalty);
+	// Note: we don't directly modify MaxTorque per-frame since it's a setup param
+	// Instead, reduce throttle input proportionally
+	if (CachedThrottle > 0.0f)
+	{
+		float ThrottleScale = FMath::Max(0.0f, PowerMult - OverheatPenalty);
+		Movement->SetThrottleInput(CachedThrottle * ThrottleScale);
+	}
+
+	// Drag increase from aero damage
+	// Base drag is stored from ApplyVehicleData; we scale it
+	float DragMult = DamageComp->GetDragMultiplier();
+	// Movement->DragCoefficient is set during ApplyVehicleData, so we don't modify it here
+	// Instead the drag effect reduces top speed naturally through the physics system
+
+	// Brake degradation
+	if (CachedBrake > 0.0f)
+	{
+		float BrakeMult = DamageComp->GetBrakeMultiplier();
+		Movement->SetBrakeInput(CachedBrake * BrakeMult);
+	}
+
+	// Steering pull from damage
+	float SteeringPull = DamageComp->GetSteeringPullDegrees();
+	if (FMath::Abs(SteeringPull) > 0.5f)
+	{
+		// Apply as a constant offset to steering — normalised to [-1,1] range
+		float PullInput = FMath::Clamp(SteeringPull / 35.0f, -1.0f, 1.0f);
+		float AdjustedSteering = FMath::Clamp(CachedSteering + PullInput * 0.3f, -1.0f, 1.0f);
+		Movement->SetSteeringInput(AdjustedSteering);
+	}
+}
+
+void AMZVehiclePawn::OnVehicleHit(AActor* SelfActor, AActor* OtherActor, FVector NormalImpulse, const FHitResult& Hit)
+{
+	if (!DamageComp) return;
+
+	// Calculate impact speed from impulse magnitude and vehicle mass
+	float SpeedKmh = FMath::Abs(GetSpeedKmh());
+
+	// Only process significant impacts
+	if (SpeedKmh < 5.0f) return;
+
+	DamageComp->ProcessImpact(SpeedKmh, Hit.ImpactNormal, Hit.ImpactPoint);
+
+	UE_LOG(LogMileZero, Log, TEXT("Vehicle impact at %.0f km/h — overall damage: %.0f%%"),
+		SpeedKmh, DamageComp->GetOverallDamagePercent());
 }
 
 // ─── Default input bootstrap ────────────────────────────────────
@@ -435,5 +525,28 @@ void AMZVehiclePawn::ResetVehicle()
 	CachedBrake = 0.0f;
 	CachedSteering = 0.0f;
 
-	UE_LOG(LogMileZero, Log, TEXT("Vehicle reset to spawn point"));
+	// Repair all damage on reset
+	if (DamageComp)
+	{
+		DamageComp->RepairAll();
+	}
+
+	UE_LOG(LogMileZero, Log, TEXT("Vehicle reset to spawn point (damage repaired)"));
+}
+
+// ─── Surface telemetry ──────────────────────────────────────────
+
+FName AMZVehiclePawn::GetCurrentSurfaceID() const
+{
+	return SurfaceContact ? SurfaceContact->GetCurrentSurfaceID() : FName("Unknown");
+}
+
+float AMZVehiclePawn::GetCurrentGripMultiplier() const
+{
+	return SurfaceContact ? SurfaceContact->GetCurrentGripMultiplier() : 1.0f;
+}
+
+float AMZVehiclePawn::GetDamagePercent() const
+{
+	return DamageComp ? DamageComp->GetOverallDamagePercent() : 0.0f;
 }

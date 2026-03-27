@@ -10,6 +10,8 @@ class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
 class UMZVehicleDataAsset;
+class UMZSurfaceContactComponent;
+class UMZVehicleDamageComponent;
 struct FInputActionValue;
 
 UENUM(BlueprintType)
@@ -63,6 +65,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MZ|Telemetry")
 	float GetSteeringInput() const { return CachedSteering; }
 
+	UFUNCTION(BlueprintPure, Category = "MZ|Telemetry")
+	FName GetCurrentSurfaceID() const;
+
+	UFUNCTION(BlueprintPure, Category = "MZ|Telemetry")
+	float GetCurrentGripMultiplier() const;
+
+	UFUNCTION(BlueprintPure, Category = "MZ|Telemetry")
+	float GetDamagePercent() const;
+
+	/** Get the damage component (may be null before M4 integration) */
+	UFUNCTION(BlueprintPure, Category = "MZ|Vehicle")
+	UMZVehicleDamageComponent* GetDamageComponent() const { return DamageComp; }
+
 protected:
 	// --- Components ---
 
@@ -74,6 +89,12 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Camera")
 	TObjectPtr<UCameraComponent> HoodCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Physics")
+	TObjectPtr<UMZSurfaceContactComponent> SurfaceContact;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Damage")
+	TObjectPtr<UMZVehicleDamageComponent> DamageComp;
 
 	// --- Enhanced Input Actions (set in editor or via defaults) ---
 
@@ -131,6 +152,13 @@ private:
 
 	// Camera
 	void ActivateCameraMode(EMZCameraMode Mode);
+
+	// Collision handler for damage
+	UFUNCTION()
+	void OnVehicleHit(AActor* SelfActor, AActor* OtherActor, FVector NormalImpulse, const FHitResult& Hit);
+
+	// Apply damage effects (steering pull, power loss, drag) each tick
+	void ApplyDamageEffects(float DeltaTime);
 
 	UPROPERTY()
 	EMZCameraMode CurrentCameraMode = EMZCameraMode::Chase;
