@@ -10,6 +10,9 @@
 #include "Components/DirectionalLightComponent.h"
 #include "Engine/SkyLight.h"
 #include "Components/SkyLightComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
+#include "Engine/ExponentialHeightFog.h"
+#include "Components/ExponentialHeightFogComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "UObject/SavePackage.h"
@@ -37,12 +40,12 @@ bool UMZSetupCommandlet::CreateTestLevel()
 {
 	const FString PackageName = TEXT("/Game/MileZero/Maps/Test/L_MZ_TestTrack");
 
-	// Check if level already exists
+	// Delete old level if it exists so we can regenerate
 	FString ExistingPath = FPackageName::LongPackageNameToFilename(PackageName, FPackageName::GetMapPackageExtension());
 	if (FPaths::FileExists(ExistingPath))
 	{
-		UE_LOG(LogMileZero, Display, TEXT("Test level already exists at %s — skipping"), *ExistingPath);
-		return true;
+		UE_LOG(LogMileZero, Display, TEXT("Removing old test level: %s"), *ExistingPath);
+		IFileManager::Get().Delete(*ExistingPath);
 	}
 
 	UE_LOG(LogMileZero, Display, TEXT("Creating test level: %s"), *PackageName);
@@ -105,18 +108,30 @@ bool UMZSetupCommandlet::CreateTestLevel()
 		}
 	}
 
-	// --- Directional light (sun) ---
+	// --- Directional light (sun) with atmosphere interaction ---
 	{
 		ADirectionalLight* Sun = World->SpawnActor<ADirectionalLight>(FVector::ZeroVector, FRotator(-45.0f, -45.0f, 0.0f), SpawnParams);
 		if (Sun)
 		{
 			Sun->SetActorLabel(TEXT("Sun"));
 			Sun->GetComponent()->SetIntensity(6.0f);
-			UE_LOG(LogMileZero, Display, TEXT("  + Directional light (sun)"));
+			Sun->GetComponent()->SetAtmosphereSunLight(true);
+			Sun->GetComponent()->SetLightingChannels(true, false, false);
+			UE_LOG(LogMileZero, Display, TEXT("  + Directional light (sun, atmosphere-linked)"));
 		}
 	}
 
-	// --- Sky light for ambient ---
+	// --- Sky Atmosphere (required for SkyLight real-time capture) ---
+	{
+		ASkyAtmosphere* Atmo = World->SpawnActor<ASkyAtmosphere>(FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+		if (Atmo)
+		{
+			Atmo->SetActorLabel(TEXT("SkyAtmosphere"));
+			UE_LOG(LogMileZero, Display, TEXT("  + SkyAtmosphere"));
+		}
+	}
+
+	// --- Sky light for ambient (now valid with SkyAtmosphere) ---
 	{
 		ASkyLight* Sky = World->SpawnActor<ASkyLight>(FVector(0.0f, 0.0f, 500.0f), FRotator::ZeroRotator, SpawnParams);
 		if (Sky)
@@ -124,7 +139,20 @@ bool UMZSetupCommandlet::CreateTestLevel()
 			Sky->SetActorLabel(TEXT("SkyLight"));
 			Sky->GetLightComponent()->SetIntensity(1.0f);
 			Sky->GetLightComponent()->bRealTimeCapture = true;
-			UE_LOG(LogMileZero, Display, TEXT("  + Sky light (ambient)"));
+			Sky->GetLightComponent()->SetMobility(EComponentMobility::Movable);
+			UE_LOG(LogMileZero, Display, TEXT("  + Sky light (real-time capture)"));
+		}
+	}
+
+	// --- Exponential height fog for atmosphere ---
+	{
+		AExponentialHeightFog* Fog = World->SpawnActor<AExponentialHeightFog>(FVector(0.0f, 0.0f, 100.0f), FRotator::ZeroRotator, SpawnParams);
+		if (Fog)
+		{
+			Fog->SetActorLabel(TEXT("HeightFog"));
+			Fog->GetComponent()->SetFogDensity(0.01f);
+			Fog->GetComponent()->SetFogHeightFalloff(0.2f);
+			UE_LOG(LogMileZero, Display, TEXT("  + Exponential height fog"));
 		}
 	}
 
