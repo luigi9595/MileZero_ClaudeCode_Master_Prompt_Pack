@@ -1,5 +1,7 @@
 #include "MZVehiclePawn.h"
 #include "MZVehicleDataAsset.h"
+#include "MZWheelFront.h"
+#include "MZWheelRear.h"
 #include "MileZero.h"
 
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -15,6 +17,57 @@
 AMZVehiclePawn::AMZVehiclePawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
+
+	// --- Default vehicle mesh (OffroadCar from template) ---
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> DefaultMesh(
+		TEXT("/Game/Vehicles/OffroadCar/SKM_Offroad"));
+	if (DefaultMesh.Succeeded())
+	{
+		GetMesh()->SetSkeletalMesh(DefaultMesh.Object);
+		GetMesh()->SetSimulatePhysics(true);
+	}
+
+	// --- Default wheel setup ---
+	UChaosWheeledVehicleMovementComponent* Movement = CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+	Movement->WheelSetups.SetNum(4);
+
+	Movement->WheelSetups[0].WheelClass = UMZWheelFront::StaticClass();
+	Movement->WheelSetups[0].BoneName = FName("PhysWheel_FL");
+
+	Movement->WheelSetups[1].WheelClass = UMZWheelFront::StaticClass();
+	Movement->WheelSetups[1].BoneName = FName("PhysWheel_FR");
+
+	Movement->WheelSetups[2].WheelClass = UMZWheelRear::StaticClass();
+	Movement->WheelSetups[2].BoneName = FName("PhysWheel_BL");
+
+	Movement->WheelSetups[3].WheelClass = UMZWheelRear::StaticClass();
+	Movement->WheelSetups[3].BoneName = FName("PhysWheel_BR");
+
+	// --- Default chassis settings ---
+	Movement->ChassisHeight = 140.0f;
+	Movement->DragCoefficient = 0.35f;
+	Movement->DownforceCoefficient = 0.1f;
+	Movement->CenterOfMassOverride = FVector(0.0f, 0.0f, -15.0f);
+	Movement->bEnableCenterOfMassOverride = true;
+	Movement->bLegacyWheelFrictionPosition = false;
+
+	// --- Default engine/transmission ---
+	Movement->EngineSetup.MaxTorque = 400.0f;
+	Movement->EngineSetup.MaxRPM = 6800.0f;
+	Movement->EngineSetup.EngineIdleRPM = 900.0f;
+	Movement->EngineSetup.EngineRevDownRate = 600.0f;
+
+	Movement->TransmissionSetup.FinalRatio = 3.9f;
+	Movement->TransmissionSetup.ForwardGearRatios.Empty();
+	Movement->TransmissionSetup.ForwardGearRatios.Add(3.6f);
+	Movement->TransmissionSetup.ForwardGearRatios.Add(2.1f);
+	Movement->TransmissionSetup.ForwardGearRatios.Add(1.4f);
+	Movement->TransmissionSetup.ForwardGearRatios.Add(1.0f);
+	Movement->TransmissionSetup.ForwardGearRatios.Add(0.77f);
+
+	// --- Default steering ---
+	Movement->SteeringSetup.SteeringType = ESteeringType::AngleRatio;
+	Movement->SteeringSetup.AngleRatio = 0.7f;
 
 	// --- Chase camera rig ---
 	ChaseBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("ChaseBoom"));
