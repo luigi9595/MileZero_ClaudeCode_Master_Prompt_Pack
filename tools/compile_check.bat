@@ -5,6 +5,7 @@ REM Faster feedback loop than full build
 setlocal
 
 set UE_ROOT=
+if exist "C:\Program Files\Epic Games\UE_5.7" set UE_ROOT=C:\Program Files\Epic Games\UE_5.7
 if exist "C:\Program Files\Epic Games\UE_5.5" set UE_ROOT=C:\Program Files\Epic Games\UE_5.5
 if exist "C:\Program Files\Epic Games\UE_5.4" set UE_ROOT=C:\Program Files\Epic Games\UE_5.4
 

@@ -8,6 +8,7 @@ class UChaosWheeledVehicleMovementComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UInputMappingContext;
 class UMZVehicleDataAsset;
 struct FInputActionValue;
 
@@ -103,6 +104,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MZ|Input")
 	TObjectPtr<UInputAction> IA_Look;
 
+	// Runtime-created mapping context (used when no editor assets exist)
+	UPROPERTY()
+	TObjectPtr<UInputMappingContext> BootstrappedMappingContext;
+
 	// --- Vehicle data ---
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MZ|Vehicle")
@@ -120,6 +125,9 @@ private:
 	void HandleCameraCycle();
 	void HandleResetVehicle();
 	void HandleLook(const FInputActionValue& Value);
+
+	// Bootstrap input if no editor assets assigned
+	void BootstrapDefaultInput();
 
 	// Camera
 	void ActivateCameraMode(EMZCameraMode Mode);

@@ -7,7 +7,10 @@ setlocal
 REM Try to find UnrealBuildTool via registry or common paths
 set UBT_PATH=
 
-REM Check common Epic Games Launcher install paths
+REM Check common Epic Games Launcher install paths (newest first)
+if exist "C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe" (
+    set UBT_PATH=C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe
+)
 if exist "C:\Program Files\Epic Games\UE_5.5\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe" (
     set UBT_PATH=C:\Program Files\Epic Games\UE_5.5\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe
 )

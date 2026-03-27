@@ -6,6 +6,10 @@ public class MileZero : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
+		// Module root must be explicitly added for V6 build settings
+		// so subdirectory files can find headers in the module root
+		PrivateIncludePaths.Add(ModuleDirectory);
+
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
 			"Core",
@@ -24,5 +28,13 @@ public class MileZero : ModuleRules
 		{
 			"ChaosVehiclesCore"
 		});
+
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.AddRange(new string[]
+			{
+				"UnrealEd"
+			});
+		}
 	}
 }

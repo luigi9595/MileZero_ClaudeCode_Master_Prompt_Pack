@@ -6,7 +6,11 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputAction.h"
 #include "InputActionValue.h"
+#include "InputMappingContext.h"
+#include "InputModifiers.h"
 
 AMZVehiclePawn::AMZVehiclePawn()
 {
@@ -59,11 +63,78 @@ void AMZVehiclePawn::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
+// ─── Default input bootstrap ────────────────────────────────────
+
+void AMZVehiclePawn::BootstrapDefaultInput()
+{
+	UE_LOG(LogMileZero, Log, TEXT("Bootstrapping default vehicle input (no editor assets assigned)"));
+
+	auto MakeAction = [this](FName Name, EInputActionValueType ValueType) -> UInputAction*
+	{
+		UInputAction* Action = NewObject<UInputAction>(this, Name);
+		Action->ValueType = ValueType;
+		return Action;
+	};
+
+	IA_Throttle     = MakeAction(TEXT("IA_MZ_Throttle"),     EInputActionValueType::Axis1D);
+	IA_Brake        = MakeAction(TEXT("IA_MZ_Brake"),        EInputActionValueType::Axis1D);
+	IA_Steer        = MakeAction(TEXT("IA_MZ_Steer"),        EInputActionValueType::Axis1D);
+	IA_Handbrake    = MakeAction(TEXT("IA_MZ_Handbrake"),    EInputActionValueType::Boolean);
+	IA_ShiftUp      = MakeAction(TEXT("IA_MZ_ShiftUp"),      EInputActionValueType::Boolean);
+	IA_ShiftDown    = MakeAction(TEXT("IA_MZ_ShiftDown"),    EInputActionValueType::Boolean);
+	IA_CameraCycle  = MakeAction(TEXT("IA_MZ_CameraCycle"),  EInputActionValueType::Boolean);
+	IA_ResetVehicle = MakeAction(TEXT("IA_MZ_ResetVehicle"), EInputActionValueType::Boolean);
+	IA_Look         = MakeAction(TEXT("IA_MZ_Look"),         EInputActionValueType::Axis2D);
+
+	// Build mapping context with default keyboard/mouse bindings
+	BootstrappedMappingContext = NewObject<UInputMappingContext>(this, TEXT("IMC_MZ_Vehicle_Default"));
+
+	BootstrappedMappingContext->MapKey(IA_Throttle, EKeys::W);
+	BootstrappedMappingContext->MapKey(IA_Brake, EKeys::S);
+
+	// Steer: D = positive, A = negative (negate modifier)
+	BootstrappedMappingContext->MapKey(IA_Steer, EKeys::D);
+	FEnhancedActionKeyMapping& SteerNeg = BootstrappedMappingContext->MapKey(IA_Steer, EKeys::A);
+	SteerNeg.Modifiers.Add(NewObject<UInputModifierNegate>(this));
+
+	BootstrappedMappingContext->MapKey(IA_Handbrake, EKeys::SpaceBar);
+	BootstrappedMappingContext->MapKey(IA_ShiftUp, EKeys::E);
+	BootstrappedMappingContext->MapKey(IA_ShiftDown, EKeys::Q);
+	BootstrappedMappingContext->MapKey(IA_CameraCycle, EKeys::C);
+	BootstrappedMappingContext->MapKey(IA_ResetVehicle, EKeys::R);
+	BootstrappedMappingContext->MapKey(IA_Look, EKeys::Mouse2D);
+
+	// Also add gamepad mappings
+	BootstrappedMappingContext->MapKey(IA_Throttle, EKeys::Gamepad_RightTriggerAxis);
+	BootstrappedMappingContext->MapKey(IA_Brake, EKeys::Gamepad_LeftTriggerAxis);
+	BootstrappedMappingContext->MapKey(IA_Steer, EKeys::Gamepad_LeftX);
+	BootstrappedMappingContext->MapKey(IA_Handbrake, EKeys::Gamepad_FaceButton_Bottom);
+	BootstrappedMappingContext->MapKey(IA_ResetVehicle, EKeys::Gamepad_FaceButton_Top);
+	BootstrappedMappingContext->MapKey(IA_CameraCycle, EKeys::Gamepad_FaceButton_Right);
+	BootstrappedMappingContext->MapKey(IA_Look, EKeys::Gamepad_Right2D);
+
+	// Register the mapping context
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Sub = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+		{
+			Sub->AddMappingContext(BootstrappedMappingContext, 0);
+			UE_LOG(LogMileZero, Log, TEXT("Default driving input context registered"));
+		}
+	}
+}
+
 // ─── Input binding ──────────────────────────────────────────────
 
 void AMZVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	// Bootstrap input actions and mapping context if none assigned in editor
+	if (!IA_Throttle)
+	{
+		BootstrapDefaultInput();
+	}
 
 	UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
 	if (!EIC)
@@ -207,7 +278,11 @@ float AMZVehiclePawn::GetSpeedKmh() const
 
 float AMZVehiclePawn::GetRPM() const
 {
-	return GetVehicleMovementComponent()->GetEngineRotationSpeed();
+	if (const UChaosWheeledVehicleMovementComponent* WheeledMC = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
+	{
+		return WheeledMC->GetEngineRotationSpeed();
+	}
+	return 0.0f;
 }
 
 int32 AMZVehiclePawn::GetCurrentGear() const
@@ -254,8 +329,14 @@ void AMZVehiclePawn::ApplyVehicleData(const UMZVehicleDataAsset* Data)
 		Movement->TransmissionSetup.ForwardGearRatios = Data->GearRatios;
 	}
 
-	// Steering
-	Movement->SteeringSetup.MaxSteeringAngle = Data->MaxSteerAngle;
+	// Steering — set per-wheel max steer angle (front wheels typically 0 and 1)
+	for (int32 i = 0; i < Movement->GetNumWheels(); ++i)
+	{
+		if (i < 2) // front axle
+		{
+			Movement->SetWheelMaxSteerAngle(i, Data->MaxSteerAngle);
+		}
+	}
 
 	// Drag
 	Movement->DragCoefficient = Data->DragCoefficient;

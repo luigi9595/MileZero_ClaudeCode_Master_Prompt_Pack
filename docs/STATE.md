@@ -1,40 +1,41 @@
 # STATE
 
 ## Snapshot
-- Date: 2026-03-16
-- Current milestone: M0 — Project bootstrap and repo truth
-- Current status: BLOCKED
-- Current gate: compile verification — requires UE5 and Visual Studio
-- Repository truth summary: complete text-side UE5 project skeleton (24 source files, 4 configs, 4 tool scripts, 1 Python automation script), zero binary assets
+- Date: 2026-03-27
+- Current milestone: M1 — First drivable core
+- Current status: IN_PROGRESS
+- Current gate: editor asset creation → PIE drivable loop
+- Repository truth summary: UE 5.7 project compiles cleanly (24 source files, VS 2026 Community + MSVC 14.44), zero binary assets yet
 
 ## Last verified action
-- Command or action: exhaustive search for UE5 / VS / Epic Launcher on this machine
-- Result: CONFIRMED NOT INSTALLED — no UE5, no VS, no Epic Launcher, no build tools, no registry entries
+- Command or action: `Build.bat MileZeroEditor Win64 Development` via UE 5.7 UBT
+- Result: **PASS — 4/4 actions succeeded, 0 errors, UnrealEditor-MileZero.dll linked**
 - Evidence location: docs/VERIFICATION.md
 
 ## Current blockers / risks
-- Blocker 1: **No Unreal Engine 5.x anywhere on this machine** (checked: PATH, registry, C:/D:/E: drives, ProgramData, Epic manifests, vswhere)
-- Blocker 2: **No Visual Studio or MSVC build tools** (checked: PATH, VS2019/2022 dirs, BuildTools dirs, vswhere)
-- These are hard external blockers. No text-side workaround can advance past M0 compile gate.
+- No hard blockers. Toolchain is fully operational.
+- Risk: editor binary assets (maps, input actions, skeletal meshes) still need to be created in-editor or via automation.
 
 ## Files changed in this session
-- Source/MileZero/Debug/MZDebugSubsystem.h/.cpp (fixed: UFUNCTION(Exec) → IConsoleManager registration)
-- tools/setup_editor_assets.py (created: automated first-boot asset creation)
-- docs/KNOWN_ISSUES.md (updated: 5 compile/runtime risks documented)
-- docs/EDITOR_BOOTSTRAP.md (updated: exact click-by-click first-boot guide)
-- docs/STATE.md (updated: BLOCKED status)
-- docs/VERIFICATION.md (updated)
-- docs/MILESTONE_STATUS.md (updated)
-- docs/BUILD_RUNBOOK.md (updated)
+- Source/MileZero/MileZero.Build.cs (fixed: V6 include paths + conditional UnrealEd dependency)
+- Source/MileZero/Vehicles/MZVehiclePawn.h/.cpp (fixed: API calls + added BootstrapDefaultInput)
+- Source/MileZero/Setup/MZSetupCommandlet.h/.cpp (created: auto-generates test level)
+- Content/MileZero/Maps/Test/L_MZ_TestTrack.umap (created via commandlet)
+- Content/Vehicles/ (copied: OffroadCar + SportsCar template assets)
+- Config/DefaultEngine.ini (fixed: removed invalid DefaultGraphicsRHI)
+- Config/DefaultGame.ini (fixed: ProjectID → GUID format)
+- docs/ (all updated: STATE, TODO, VERIFICATION, MILESTONE_STATUS, KNOWN_ISSUES, EDITOR_BOOTSTRAP)
 
 ## Next immediate actions
-1. **YOU**: Install Epic Games Launcher → Install Unreal Engine 5.5 → Install Visual Studio 2022 with "Game development with C++" workload
-2. Then run: `tools\generate_project_files.bat` or right-click MileZero.uproject → "Generate Visual Studio project files"
-3. Then run: `tools\compile_check.bat`
-4. Then run: `tools\setup_editor_assets.py` in the editor's Python console, or follow docs/EDITOR_BOOTSTRAP.md manually
+1. Open editor: `tools\open_editor.bat`
+2. Create `BP_MZVehicle_Hatch` Blueprint from `MZVehiclePawn` class
+3. Assign `SKM_Offroad` or `SKM_SportsCar` skeletal mesh + configure wheel setups
+4. Set GameMode default pawn to the new Blueprint
+5. PIE test in L_MZ_TestTrack
 
 ## Notes for next session
-- MZDebugSubsystem was fixed: console commands now use IConsoleManager (MZ.ResetVehicle, MZ.SpawnVehicle, MZ.Teleport, MZ.Telemetry)
-- 5 compile/runtime risks documented in KNOWN_ISSUES.md — all are targeted one-line fixes
-- setup_editor_assets.py will create input actions, mapping context, vehicle data asset, surface data assets, and test map on first run
-- The gap to M1 is: install toolchain → compile → create assets → PIE test
+- UE 5.7 + VS 2026 Community (18 Insiders) with MSVC 14.44 confirmed working
+- Build settings: BuildSettingsVersion.V6, EngineIncludeOrderVersion.Unreal5_7
+- Input actions + mapping context auto-created at runtime (no editor asset setup needed)
+- Test level created via MZSetup commandlet with floor, PlayerStart, lights
+- Only remaining M1 blocker: vehicle needs skeletal mesh assigned in a Blueprint

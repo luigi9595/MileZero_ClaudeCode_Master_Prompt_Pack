@@ -2,8 +2,8 @@
 
 | Milestone | Status | Current Gate | Last Evidence | Next Action | Owner |
 |---|---|---|---|---|---|
-| M0 — Project bootstrap and repo truth | BLOCKED | compile verification (no UE5/VS on machine) | 2026-03-16: full text-side scaffolding, code audit, automation script | install UE5 5.5 + VS2022, run compile_check.bat | User → Claude |
-| M1 — First drivable core | NOT_STARTED | none | M1 source code pre-built, editor automation script ready | after M0: create assets → PIE test | Claude |
+| M0 — Project bootstrap and repo truth | VERIFIED | all gates passed | 2026-03-27: clean compile on UE 5.7 + VS 2026 (3 attempts, 2 fixes) | — | Claude |
+| M1 — First drivable core | IN_PROGRESS | editor asset creation → PIE drivable loop | source code compiles, no binary assets yet | create input actions, test map, vehicle BP → PIE | Claude |
 | M2 — Surface system and telemetry | NOT_STARTED | none | surface data asset + contact component written | wire to vehicle, build telemetry after M1 | Claude |
 | M3 — Vehicle trio differentiation | NOT_STARTED | none | vehicle data asset class exists | create 3 data assets + tuning after M2 | Claude |
 | M4 — Mechanical damage consequences | NOT_STARTED | none | none | build damage component and data after M3 | Claude |

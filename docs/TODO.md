@@ -1,12 +1,14 @@
 # TODO
 
-## Now (BLOCKED — requires user action)
-- [ ] **USER ACTION**: install Epic Games Launcher + Unreal Engine 5.5 + Visual Studio 2022 (see docs/BUILD_RUNBOOK.md for exact steps)
-- [ ] run `tools\generate_project_files.bat`
-- [ ] run `tools\compile_check.bat` — fix any compile errors per docs/KNOWN_ISSUES.md
-- [ ] open editor, run `tools/setup_editor_assets.py` or follow docs/EDITOR_BOOTSTRAP.md
-- [ ] set up vehicle mesh + wheel bones on BP wrapper or default pawn
-- [ ] PIE test in L_MZ_TestTrack → verify M1 gates
+## Now (M1 — First drivable core)
+- [x] ~~install toolchain~~ UE 5.7 + VS 2026 confirmed
+- [x] ~~compile project~~ PASS on 2026-03-27
+- [x] ~~input actions~~ auto-bootstrap at runtime (no editor assets needed)
+- [x] ~~test level~~ L_MZ_TestTrack.umap created via MZSetup commandlet
+- [x] ~~vehicle template content~~ OffroadCar + SportsCar copied to Content/Vehicles/
+- [ ] create `BP_MZVehicle_Hatch` Blueprint (assign mesh + wheel setups)
+- [ ] set GameMode default pawn to Blueprint
+- [ ] PIE test: throttle, brake, steer, handbrake, camera, reset
 
 ## Next (after M0+M1 verified)
 - [ ] wire UMZSurfaceContactComponent to vehicle pawn
