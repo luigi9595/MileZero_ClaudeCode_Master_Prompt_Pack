@@ -9,6 +9,9 @@
 #include "MileZero.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/StaticMeshActor.h"
+#include "Components/StaticMeshComponent.h"
+#include "EngineUtils.h"
 
 AMZGameMode::AMZGameMode()
 {
@@ -22,6 +25,52 @@ void AMZGameMode::InitGame(const FString& MapName, const FString& Options, FStri
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
 	UE_LOG(LogMileZero, Log, TEXT("MZGameMode::InitGame — Map: %s"), *MapName);
+}
+
+void AMZGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+	EnsureTestFloor();
+}
+
+void AMZGameMode::EnsureTestFloor()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	// Count existing static mesh actors. If none exist, the level is empty (test track not yet built)
+	// and the vehicle would fall through the void — spawn a temporary floor.
+	int32 ExistingMeshCount = 0;
+	for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+	{
+		++ExistingMeshCount;
+	}
+
+	if (ExistingMeshCount > 0)
+	{
+		return; // Level already has geometry
+	}
+
+	UStaticMesh* PlaneMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Plane.Plane"));
+	if (!PlaneMesh)
+	{
+		UE_LOG(LogMileZero, Warning, TEXT("EnsureTestFloor: cannot load /Engine/BasicShapes/Plane — vehicle may fall through the world"));
+		return;
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AStaticMeshActor* Floor = World->SpawnActor<AStaticMeshActor>(FVector(0.f, 0.f, 0.f), FRotator::ZeroRotator, Params);
+	if (Floor)
+	{
+		Floor->GetStaticMeshComponent()->SetStaticMesh(PlaneMesh);
+		Floor->SetActorScale3D(FVector(500.f, 500.f, 1.f)); // 5000 UU = 50 m each side
+		Floor->SetActorLabel(TEXT("TestFloor_Runtime"));
+		UE_LOG(LogMileZero, Log, TEXT("EnsureTestFloor: no geometry found — spawned 50x50m runtime floor at origin"));
+	}
 }
 
 APawn* AMZGameMode::SpawnDefaultPawnAtTransform_Implementation(AController* NewPlayer, const FTransform& SpawnTransform)

@@ -7,6 +7,7 @@
 #include "MileZero.h"
 
 #include "ChaosWheeledVehicleMovementComponent.h"
+#include "Curves/RichCurve.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "EnhancedInputComponent.h"
@@ -58,6 +59,17 @@ AMZVehiclePawn::AMZVehiclePawn()
 	Movement->EngineSetup.MaxRPM = 6800.0f;
 	Movement->EngineSetup.EngineIdleRPM = 900.0f;
 	Movement->EngineSetup.EngineRevDownRate = 600.0f;
+
+	// Torque curve: X = normalized RPM (0-1), Y = normalized torque (0-1, relative to MaxTorque)
+	// Chaos disables mechanical simulation entirely if this curve has zero keys.
+	{
+		FRichCurve* TorqueCurve = Movement->EngineSetup.TorqueCurve.GetRichCurve();
+		TorqueCurve->AddKey(0.0f, 0.5f);   // 50% torque at idle
+		TorqueCurve->AddKey(0.2f, 0.8f);   // torque builds quickly off idle
+		TorqueCurve->AddKey(0.5f, 1.0f);   // peak torque at mid-RPM
+		TorqueCurve->AddKey(0.75f, 0.9f);  // slight drop above peak
+		TorqueCurve->AddKey(1.0f, 0.6f);   // drop-off near redline
+	}
 
 	Movement->TransmissionSetup.FinalRatio = 3.9f;
 	Movement->TransmissionSetup.ForwardGearRatios.Empty();

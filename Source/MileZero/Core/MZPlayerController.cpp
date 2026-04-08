@@ -51,14 +51,24 @@ void AMZPlayerController::SwitchToDrivingInput()
 		{
 			Subsystem->AddMappingContext(DrivingMappingContext, 0);
 		}
+		else
+		{
+			// No editor-assigned DrivingMappingContext. The vehicle pawn's BootstrapDefaultInput()
+			// will create and register its own mapping context when possessed.
+			UE_LOG(LogMileZero, Log, TEXT("SwitchToDrivingInput: no DrivingMappingContext set — vehicle pawn will bootstrap input on possession"));
+		}
 		if (UIMappingContext)
 		{
 			Subsystem->AddMappingContext(UIMappingContext, 1);
 		}
 	}
 
+	// Hide cursor and lock mouse for driving — required for mouse look input to work
+	bShowMouseCursor = false;
+	SetInputMode(FInputModeGameOnly());
+
 	bIsDriving = true;
-	UE_LOG(LogMileZero, Log, TEXT("Switched to driving input"));
+	UE_LOG(LogMileZero, Log, TEXT("Switched to driving input (cursor hidden, game-only input mode)"));
 }
 
 void AMZPlayerController::RequestEnterVehicle()
