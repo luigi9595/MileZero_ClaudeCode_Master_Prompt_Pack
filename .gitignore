@@ -28,3 +28,4 @@ CrashReportClient/
 
 # Local settings that shouldn't be shared
 .claude/settings.local.json
+.claude/worktrees/

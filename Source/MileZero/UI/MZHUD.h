@@ -5,6 +5,8 @@
 #include "MZHUD.generated.h"
 
 class SMZHUDWidget;
+class SMZMinimapWidget;
+class SMZNotificationWidget;
 
 /**
  * Main HUD manager. Owns and manages the gameplay HUD widget lifecycle.
@@ -22,4 +24,6 @@ public:
 
 private:
 	TSharedPtr<SMZHUDWidget> HUDWidget;
+	TSharedPtr<SMZMinimapWidget> MinimapWidget;
+	TSharedPtr<SMZNotificationWidget> NotificationWidget;
 };

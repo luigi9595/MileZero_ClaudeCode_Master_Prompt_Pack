@@ -4,9 +4,12 @@
 #include "MZWheelRear.h"
 #include "Surfaces/MZSurfaceContactComponent.h"
 #include "Damage/MZVehicleDamageComponent.h"
+#include "Audio/MZRadioManager.h"
+#include "Core/MZPlayerController.h"
 #include "MileZero.h"
 
 #include "ChaosWheeledVehicleMovementComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "EnhancedInputComponent.h"
@@ -20,56 +23,135 @@ AMZVehiclePawn::AMZVehiclePawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// --- Default vehicle mesh (OffroadCar from template) ---
+	// --- Default vehicle mesh (SportsCar from template) ---
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> DefaultMesh(
-		TEXT("/Game/Vehicles/OffroadCar/SKM_Offroad"));
+		TEXT("/Game/Vehicles/SportsCar/SKM_SportsCar"));
 	if (DefaultMesh.Succeeded())
 	{
 		GetMesh()->SetSkeletalMesh(DefaultMesh.Object);
 		GetMesh()->SetSimulatePhysics(true);
 	}
 
-	// --- Default wheel setup ---
+	// --- Animation Blueprint (essential for wheel animation) ---
+	static ConstructorHelpers::FClassFinder<UAnimInstance> DefaultAnimBP(
+		TEXT("/Game/Vehicles/SportsCar/ABP_SportsCar"));
+	if (DefaultAnimBP.Succeeded())
+	{
+		GetMesh()->SetAnimInstanceClass(DefaultAnimBP.Class);
+	}
+
+	// --- Car body (separate static mesh attached to skeleton root) ---
+	BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
+	BodyMesh->SetupAttachment(GetMesh());
+	BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyMeshAsset(
+		TEXT("/Game/Vehicles/SportsCar/SM_SportsCar"));
+	if (BodyMeshAsset.Succeeded())
+	{
+		BodyMesh->SetStaticMesh(BodyMeshAsset.Object);
+	}
+
+	// --- Glass mesh ---
+	GlassMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("GlassMesh"));
+	GlassMesh->SetupAttachment(GetMesh());
+	GlassMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> GlassMeshAsset(
+		TEXT("/Game/Vehicles/SportsCar/SM_SportsCar_Glass"));
+	if (GlassMeshAsset.Succeeded())
+	{
+		GlassMesh->SetStaticMesh(GlassMeshAsset.Object);
+	}
+
+	// --- Default wheel setup (SportsCar bone names: Phys_Wheel_XX) ---
 	UChaosWheeledVehicleMovementComponent* Movement = CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
 	Movement->WheelSetups.SetNum(4);
 
 	Movement->WheelSetups[0].WheelClass = UMZWheelFront::StaticClass();
-	Movement->WheelSetups[0].BoneName = FName("PhysWheel_FL");
+	Movement->WheelSetups[0].BoneName = FName("Phys_Wheel_FL");
 
 	Movement->WheelSetups[1].WheelClass = UMZWheelFront::StaticClass();
-	Movement->WheelSetups[1].BoneName = FName("PhysWheel_FR");
+	Movement->WheelSetups[1].BoneName = FName("Phys_Wheel_FR");
 
 	Movement->WheelSetups[2].WheelClass = UMZWheelRear::StaticClass();
-	Movement->WheelSetups[2].BoneName = FName("PhysWheel_BL");
+	Movement->WheelSetups[2].BoneName = FName("Phys_Wheel_BL");
 
 	Movement->WheelSetups[3].WheelClass = UMZWheelRear::StaticClass();
-	Movement->WheelSetups[3].BoneName = FName("PhysWheel_BR");
+	Movement->WheelSetups[3].BoneName = FName("Phys_Wheel_BR");
 
-	// --- Default chassis settings ---
+	// --- Wheel meshes (attached to skeleton bone sockets) ---
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> WheelMeshAsset(
+		TEXT("/Game/Vehicles/SportsCar/SM_SportsCar_Wheel"));
+
+	auto CreateWheelMesh = [&](const TCHAR* Name, FName BoneName, bool bRightSide) -> UStaticMeshComponent*
+	{
+		UStaticMeshComponent* WM = CreateDefaultSubobject<UStaticMeshComponent>(Name);
+		WM->SetupAttachment(GetMesh(), BoneName);
+		WM->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		if (WheelMeshAsset.Succeeded())
+		{
+			WM->SetStaticMesh(WheelMeshAsset.Object);
+		}
+		if (bRightSide)
+		{
+			// Mirror right side + flip 180° so tire tread direction is correct
+			WM->SetRelativeScale3D(FVector(1.0f, -1.0f, 1.0f));
+			WM->SetRelativeRotation(FRotator(0.0f, 180.0f, 0.0f));
+		}
+		return WM;
+	};
+
+	WheelMesh_FL = CreateWheelMesh(TEXT("WheelMesh_FL"), FName("Phys_Wheel_FL"), false);
+	WheelMesh_FR = CreateWheelMesh(TEXT("WheelMesh_FR"), FName("Phys_Wheel_FR"), true);
+	WheelMesh_BL = CreateWheelMesh(TEXT("WheelMesh_BL"), FName("Phys_Wheel_BL"), false);
+	WheelMesh_BR = CreateWheelMesh(TEXT("WheelMesh_BR"), FName("Phys_Wheel_BR"), true);
+
+	// --- Chassis physics (realistic sports car) ---
 	Movement->ChassisHeight = 140.0f;
-	Movement->DragCoefficient = 0.35f;
-	Movement->DownforceCoefficient = 0.1f;
-	Movement->CenterOfMassOverride = FVector(0.0f, 0.0f, -15.0f);
+	Movement->DragCoefficient = 0.32f;
+	Movement->DownforceCoefficient = 0.3f;
+	Movement->CenterOfMassOverride = FVector(-5.0f, 0.0f, -40.0f); // low & slightly forward
 	Movement->bEnableCenterOfMassOverride = true;
 	Movement->bLegacyWheelFrictionPosition = false;
 
-	// --- Default engine/transmission ---
-	Movement->EngineSetup.MaxTorque = 400.0f;
-	Movement->EngineSetup.MaxRPM = 6800.0f;
-	Movement->EngineSetup.EngineIdleRPM = 900.0f;
-	Movement->EngineSetup.EngineRevDownRate = 600.0f;
+	// Mass — realistic sports car ~1300 kg
+	GetMesh()->SetMassOverrideInKg(NAME_None, 1300.0f, true);
 
-	Movement->TransmissionSetup.FinalRatio = 3.9f;
+	// --- Engine (realistic NA sports car) ---
+	Movement->EngineSetup.MaxTorque = 350.0f;
+	Movement->EngineSetup.MaxRPM = 7000.0f;
+	Movement->EngineSetup.EngineIdleRPM = 800.0f;
+	Movement->EngineSetup.EngineRevDownRate = 800.0f;
+
+	// Torque curve — realistic NA profile
+	FRichCurve* TorqueCurve = Movement->EngineSetup.TorqueCurve.GetRichCurve();
+	TorqueCurve->Reset();
+	TorqueCurve->AddKey(0.0f, 0.4f);      // 40% at idle
+	TorqueCurve->AddKey(0.15f, 0.65f);    // building torque
+	TorqueCurve->AddKey(0.35f, 0.85f);    // mid-range
+	TorqueCurve->AddKey(0.55f, 1.0f);     // peak torque
+	TorqueCurve->AddKey(0.75f, 0.92f);    // slight drop
+	TorqueCurve->AddKey(0.90f, 0.75f);    // falling off
+	TorqueCurve->AddKey(1.0f, 0.55f);     // redline
+
+	// --- Transmission (5-speed realistic ratios) ---
+	Movement->TransmissionSetup.FinalRatio = 3.7f;
 	Movement->TransmissionSetup.ForwardGearRatios.Empty();
-	Movement->TransmissionSetup.ForwardGearRatios.Add(3.6f);
-	Movement->TransmissionSetup.ForwardGearRatios.Add(2.1f);
-	Movement->TransmissionSetup.ForwardGearRatios.Add(1.4f);
-	Movement->TransmissionSetup.ForwardGearRatios.Add(1.0f);
-	Movement->TransmissionSetup.ForwardGearRatios.Add(0.77f);
+	Movement->TransmissionSetup.ForwardGearRatios.Add(3.4f);   // 1st
+	Movement->TransmissionSetup.ForwardGearRatios.Add(2.1f);   // 2nd
+	Movement->TransmissionSetup.ForwardGearRatios.Add(1.45f);  // 3rd
+	Movement->TransmissionSetup.ForwardGearRatios.Add(1.05f);  // 4th
+	Movement->TransmissionSetup.ForwardGearRatios.Add(0.80f);  // 5th
+	Movement->TransmissionSetup.ReverseGearRatios.Empty();
+	Movement->TransmissionSetup.ReverseGearRatios.Add(3.4f);
 
-	// --- Default steering ---
+	// --- Steering ---
 	Movement->SteeringSetup.SteeringType = ESteeringType::AngleRatio;
-	Movement->SteeringSetup.AngleRatio = 0.7f;
+	Movement->SteeringSetup.AngleRatio = 0.8f;
+
+	// --- Transmission: automatic ---
+	Movement->TransmissionSetup.bUseAutomaticGears = true;
+	Movement->TransmissionSetup.GearChangeTime = 0.25f;
+	Movement->TransmissionSetup.TransmissionEfficiency = 0.92f;
 
 	// --- Chase camera rig ---
 	ChaseBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("ChaseBoom"));
@@ -119,6 +201,22 @@ void AMZVehiclePawn::BeginPlay()
 	// Register collision handler for damage system
 	OnActorHit.AddDynamic(this, &AMZVehiclePawn::OnVehicleHit);
 
+	// Ensure the bootstrapped mapping context is registered now that the controller is ready.
+	// SetupPlayerInputComponent may be called before the input subsystem is fully available,
+	// so we re-register here as a safety net.
+	if (BootstrappedMappingContext)
+	{
+		if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		{
+			if (UEnhancedInputLocalPlayerSubsystem* Sub = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+			{
+				Sub->ClearAllMappings();
+				Sub->AddMappingContext(BootstrappedMappingContext, 0);
+				UE_LOG(LogMileZero, Log, TEXT("Re-registered driving input context in BeginPlay"));
+			}
+		}
+	}
+
 	UE_LOG(LogMileZero, Log, TEXT("MZVehiclePawn spawned at %s"), *SpawnTransform.GetLocation().ToString());
 }
 
@@ -128,6 +226,11 @@ void AMZVehiclePawn::Tick(float DeltaTime)
 
 	UChaosWheeledVehicleMovementComponent* WheeledMovement = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
 	if (!WheeledMovement) return;
+
+	// --- Re-apply ALL inputs every tick (Chaos resets per physics step) ---
+	WheeledMovement->SetThrottleInput(CachedThrottle);
+	WheeledMovement->SetBrakeInput(CachedBrake);
+	WheeledMovement->SetSteeringInput(CachedSteering);
 
 	// --- Surface grip ---
 	float BaseGrip = SurfaceContact ? SurfaceContact->GetCurrentGripMultiplier() : 1.0f;
@@ -143,7 +246,7 @@ void AMZVehiclePawn::Tick(float DeltaTime)
 		WheeledMovement->SetWheelFrictionMultiplier(i, WheelGrip);
 	}
 
-	// --- Damage effects on vehicle dynamics ---
+	// --- Damage effects on vehicle dynamics (modifies inputs above) ---
 	ApplyDamageEffects(DeltaTime);
 }
 
@@ -221,13 +324,16 @@ void AMZVehiclePawn::BootstrapDefaultInput()
 
 	IA_Throttle     = MakeAction(TEXT("IA_MZ_Throttle"),     EInputActionValueType::Axis1D);
 	IA_Brake        = MakeAction(TEXT("IA_MZ_Brake"),        EInputActionValueType::Axis1D);
-	IA_Steer        = MakeAction(TEXT("IA_MZ_Steer"),        EInputActionValueType::Axis1D);
+	IA_SteerLeft    = MakeAction(TEXT("IA_MZ_SteerLeft"),    EInputActionValueType::Boolean);
+	IA_SteerRight   = MakeAction(TEXT("IA_MZ_SteerRight"),   EInputActionValueType::Boolean);
 	IA_Handbrake    = MakeAction(TEXT("IA_MZ_Handbrake"),    EInputActionValueType::Boolean);
 	IA_ShiftUp      = MakeAction(TEXT("IA_MZ_ShiftUp"),      EInputActionValueType::Boolean);
 	IA_ShiftDown    = MakeAction(TEXT("IA_MZ_ShiftDown"),    EInputActionValueType::Boolean);
 	IA_CameraCycle  = MakeAction(TEXT("IA_MZ_CameraCycle"),  EInputActionValueType::Boolean);
 	IA_ResetVehicle = MakeAction(TEXT("IA_MZ_ResetVehicle"), EInputActionValueType::Boolean);
 	IA_Look         = MakeAction(TEXT("IA_MZ_Look"),         EInputActionValueType::Axis2D);
+	IA_ExitVehicle  = MakeAction(TEXT("IA_MZ_ExitVehicle"),  EInputActionValueType::Boolean);
+	IA_RadioNext    = MakeAction(TEXT("IA_MZ_RadioNext"),    EInputActionValueType::Boolean);
 
 	// Build mapping context with default keyboard/mouse bindings
 	BootstrappedMappingContext = NewObject<UInputMappingContext>(this, TEXT("IMC_MZ_Vehicle_Default"));
@@ -235,22 +341,23 @@ void AMZVehiclePawn::BootstrapDefaultInput()
 	BootstrappedMappingContext->MapKey(IA_Throttle, EKeys::W);
 	BootstrappedMappingContext->MapKey(IA_Brake, EKeys::S);
 
-	// Steer: D = positive, A = negative (negate modifier)
-	BootstrappedMappingContext->MapKey(IA_Steer, EKeys::D);
-	FEnhancedActionKeyMapping& SteerNeg = BootstrappedMappingContext->MapKey(IA_Steer, EKeys::A);
-	SteerNeg.Modifiers.Add(NewObject<UInputModifierNegate>(this));
+	// Steer: separate boolean actions — bulletproof
+	BootstrappedMappingContext->MapKey(IA_SteerRight, EKeys::D);
+	BootstrappedMappingContext->MapKey(IA_SteerLeft, EKeys::A);
 
 	BootstrappedMappingContext->MapKey(IA_Handbrake, EKeys::SpaceBar);
 	BootstrappedMappingContext->MapKey(IA_ShiftUp, EKeys::E);
 	BootstrappedMappingContext->MapKey(IA_ShiftDown, EKeys::Q);
 	BootstrappedMappingContext->MapKey(IA_CameraCycle, EKeys::C);
 	BootstrappedMappingContext->MapKey(IA_ResetVehicle, EKeys::R);
+	BootstrappedMappingContext->MapKey(IA_ExitVehicle, EKeys::F);
+	BootstrappedMappingContext->MapKey(IA_RadioNext, EKeys::Period);
 	BootstrappedMappingContext->MapKey(IA_Look, EKeys::Mouse2D);
 
 	// Also add gamepad mappings
 	BootstrappedMappingContext->MapKey(IA_Throttle, EKeys::Gamepad_RightTriggerAxis);
 	BootstrappedMappingContext->MapKey(IA_Brake, EKeys::Gamepad_LeftTriggerAxis);
-	BootstrappedMappingContext->MapKey(IA_Steer, EKeys::Gamepad_LeftX);
+	// Gamepad steering handled via IA_Look or custom axis — skip for now
 	BootstrappedMappingContext->MapKey(IA_Handbrake, EKeys::Gamepad_FaceButton_Bottom);
 	BootstrappedMappingContext->MapKey(IA_ResetVehicle, EKeys::Gamepad_FaceButton_Top);
 	BootstrappedMappingContext->MapKey(IA_CameraCycle, EKeys::Gamepad_FaceButton_Right);
@@ -296,10 +403,15 @@ void AMZVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 		EIC->BindAction(IA_Brake, ETriggerEvent::Triggered, this, &AMZVehiclePawn::HandleBrake);
 		EIC->BindAction(IA_Brake, ETriggerEvent::Completed, this, &AMZVehiclePawn::HandleBrake);
 	}
-	if (IA_Steer)
+	if (IA_SteerLeft)
 	{
-		EIC->BindAction(IA_Steer, ETriggerEvent::Triggered, this, &AMZVehiclePawn::HandleSteering);
-		EIC->BindAction(IA_Steer, ETriggerEvent::Completed, this, &AMZVehiclePawn::HandleSteering);
+		EIC->BindAction(IA_SteerLeft, ETriggerEvent::Started, this, &AMZVehiclePawn::HandleSteerLeft);
+		EIC->BindAction(IA_SteerLeft, ETriggerEvent::Completed, this, &AMZVehiclePawn::HandleSteerLeftReleased);
+	}
+	if (IA_SteerRight)
+	{
+		EIC->BindAction(IA_SteerRight, ETriggerEvent::Started, this, &AMZVehiclePawn::HandleSteerRight);
+		EIC->BindAction(IA_SteerRight, ETriggerEvent::Completed, this, &AMZVehiclePawn::HandleSteerRightReleased);
 	}
 	if (IA_Handbrake)
 	{
@@ -326,6 +438,14 @@ void AMZVehiclePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	{
 		EIC->BindAction(IA_Look, ETriggerEvent::Triggered, this, &AMZVehiclePawn::HandleLook);
 	}
+	if (IA_ExitVehicle)
+	{
+		EIC->BindAction(IA_ExitVehicle, ETriggerEvent::Started, this, &AMZVehiclePawn::HandleExitVehicle);
+	}
+	if (IA_RadioNext)
+	{
+		EIC->BindAction(IA_RadioNext, ETriggerEvent::Started, this, &AMZVehiclePawn::HandleRadioNext);
+	}
 
 	UE_LOG(LogMileZero, Log, TEXT("Vehicle input bindings complete"));
 }
@@ -344,10 +464,28 @@ void AMZVehiclePawn::HandleBrake(const FInputActionValue& Value)
 	GetVehicleMovementComponent()->SetBrakeInput(CachedBrake);
 }
 
-void AMZVehiclePawn::HandleSteering(const FInputActionValue& Value)
+void AMZVehiclePawn::HandleSteerLeft(const FInputActionValue& Value)
 {
-	CachedSteering = Value.Get<float>();
-	GetVehicleMovementComponent()->SetSteeringInput(CachedSteering);
+	bSteerLeftHeld = true;
+	CachedSteering = (bSteerRightHeld ? 1.0f : 0.0f) + (bSteerLeftHeld ? -1.0f : 0.0f);
+}
+
+void AMZVehiclePawn::HandleSteerLeftReleased(const FInputActionValue& Value)
+{
+	bSteerLeftHeld = false;
+	CachedSteering = (bSteerRightHeld ? 1.0f : 0.0f) + (bSteerLeftHeld ? -1.0f : 0.0f);
+}
+
+void AMZVehiclePawn::HandleSteerRight(const FInputActionValue& Value)
+{
+	bSteerRightHeld = true;
+	CachedSteering = (bSteerRightHeld ? 1.0f : 0.0f) + (bSteerLeftHeld ? -1.0f : 0.0f);
+}
+
+void AMZVehiclePawn::HandleSteerRightReleased(const FInputActionValue& Value)
+{
+	bSteerRightHeld = false;
+	CachedSteering = (bSteerRightHeld ? 1.0f : 0.0f) + (bSteerLeftHeld ? -1.0f : 0.0f);
 }
 
 void AMZVehiclePawn::HandleHandbrake(const FInputActionValue& Value)
@@ -390,6 +528,29 @@ void AMZVehiclePawn::HandleLook(const FInputActionValue& Value)
 		Current.Yaw += LookInput.X;
 		Current.Pitch = FMath::Clamp(Current.Pitch + LookInput.Y, -60.0f, 10.0f);
 		ChaseBoom->SetRelativeRotation(Current);
+	}
+}
+
+void AMZVehiclePawn::HandleExitVehicle()
+{
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		if (class AMZPlayerController* MZController = Cast<class AMZPlayerController>(PC))
+		{
+			MZController->RequestExitVehicle();
+		}
+	}
+}
+
+void AMZVehiclePawn::HandleRadioNext()
+{
+	// Get radio manager from game instance
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (class UMZRadioManager* RadioManager = GI->GetSubsystem<class UMZRadioManager>())
+		{
+			RadioManager->NextStation();
+		}
 	}
 }
 
@@ -549,4 +710,11 @@ float AMZVehiclePawn::GetCurrentGripMultiplier() const
 float AMZVehiclePawn::GetDamagePercent() const
 {
 	return DamageComp ? DamageComp->GetOverallDamagePercent() : 0.0f;
+}
+
+FTransform AMZVehiclePawn::GetExitTransform() const
+{
+	// Calculate world position from vehicle-relative offset
+	FVector WorldExitPos = GetActorLocation() + GetActorRotation().RotateVector(ExitOffset);
+	return FTransform(GetActorRotation(), WorldExitPos);
 }

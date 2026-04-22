@@ -6,6 +6,8 @@
 
 class UInputMappingContext;
 class UInputAction;
+class AMZCharacter;
+class AMZVehiclePawn;
 
 UCLASS()
 class MILEZERO_API AMZPlayerController : public APlayerController
@@ -26,6 +28,12 @@ public:
 	// Telemetry toggle
 	void ToggleTelemetry();
 
+	// Pause toggle
+	void HandlePause();
+
+	/** Set the stored character reference (used by GameMode for auto-enter) */
+	void SetStoredCharacter(AMZCharacter* InChar) { StoredCharacter = InChar; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
@@ -42,6 +50,13 @@ protected:
 
 private:
 	void RemoveAllMZContexts();
+	void HandleExitVehicleInput();
+
+	UPROPERTY()
+	TObjectPtr<AMZCharacter> StoredCharacter;
+
+	UPROPERTY()
+	TObjectPtr<AMZVehiclePawn> LastVehicle;
 
 	bool bIsDriving = false;
 };

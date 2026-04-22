@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
 #include "Damage/MZDamageTypes.h"
+#include "Economy/MZEconomyTypes.h"
 #include "MZSaveGame.generated.h"
 
 /**
@@ -60,6 +61,18 @@ public:
 	// Player settings
 	UPROPERTY()
 	FMZPlayerSettings PlayerSettings;
+
+	// Current player money
+	UPROPERTY()
+	float CurrentMoney = 5000.0f;
+
+	// Player statistics (distance, playtime, activities, crashes, skill, etc.)
+	UPROPERTY()
+	FMZPlayerStats PlayerStats;
+
+	// Recent transaction history (last 50 transactions)
+	UPROPERTY()
+	TArray<FMZTransaction> RecentTransactions;
 
 	// Save slot name constant
 	static const FString DefaultSlotName;

@@ -6,7 +6,9 @@
 
 class USpringArmComponent;
 class UCameraComponent;
+class USphereComponent;
 class UInputAction;
+class AMZVehiclePawn;
 struct FInputActionValue;
 
 UCLASS()
@@ -28,6 +30,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Camera")
 	TObjectPtr<UCameraComponent> FollowCamera;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Interaction")
+	TObjectPtr<USphereComponent> VehicleDetectionSphere;
+
 	// Enhanced Input actions
 	UPROPERTY(EditDefaultsOnly, Category = "MZ|Input")
 	TObjectPtr<UInputAction> IA_Move;
@@ -41,9 +46,28 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MZ|Input")
 	TObjectPtr<UInputAction> IA_Interact;
 
+	// Vehicle entry
+	UFUNCTION(BlueprintCallable, Category = "MZ|Vehicle")
+	void EnterVehicle();
+
+public:
+	UFUNCTION(BlueprintPure, Category = "MZ|Vehicle")
+	AMZVehiclePawn* GetNearbyVehicle() const { return NearbyVehicle; }
+
 private:
 	void HandleMove(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
 	void HandleJump();
 	void HandleInteract();
+
+	UFUNCTION()
+	void OnVehicleDetectionOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnVehicleDetectionOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+	UPROPERTY(VisibleAnywhere, Category = "MZ|Vehicle")
+	TObjectPtr<AMZVehiclePawn> NearbyVehicle;
 };

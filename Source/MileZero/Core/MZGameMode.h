@@ -16,7 +16,13 @@ public:
 	AMZGameMode();
 
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+	virtual void BeginPlay() override;
 
 protected:
 	virtual APawn* SpawnDefaultPawnAtTransform_Implementation(AController* NewPlayer, const FTransform& SpawnTransform) override;
+
+private:
+	UPROPERTY()
+	class AMZCharacter* SpawnedCharacter;
 };
+

@@ -78,8 +78,41 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MZ|Vehicle")
 	UMZVehicleDamageComponent* GetDamageComponent() const { return DamageComp; }
 
+	/** Calculate exit position relative to vehicle */
+	UFUNCTION(BlueprintCallable, Category = "MZ|Vehicle")
+	FTransform GetExitTransform() const;
+
+	/** Called when driver enters the vehicle */
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "MZ|Vehicle")
+	void OnDriverEntered();
+
+	/** Called when driver exits the vehicle */
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "MZ|Vehicle")
+	void OnDriverExited();
+
 protected:
 	// --- Components ---
+
+	/** Static mesh for the car body (attached to skeletal mesh) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Vehicle")
+	TObjectPtr<UStaticMeshComponent> BodyMesh;
+
+	/** Glass mesh (attached to skeletal mesh) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Vehicle")
+	TObjectPtr<UStaticMeshComponent> GlassMesh;
+
+	/** Wheel meshes (attached to bone sockets) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Vehicle")
+	TObjectPtr<UStaticMeshComponent> WheelMesh_FL;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Vehicle")
+	TObjectPtr<UStaticMeshComponent> WheelMesh_FR;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Vehicle")
+	TObjectPtr<UStaticMeshComponent> WheelMesh_BL;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Vehicle")
+	TObjectPtr<UStaticMeshComponent> WheelMesh_BR;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MZ|Camera")
 	TObjectPtr<USpringArmComponent> ChaseBoom;
@@ -105,7 +138,10 @@ protected:
 	TObjectPtr<UInputAction> IA_Brake;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MZ|Input")
-	TObjectPtr<UInputAction> IA_Steer;
+	TObjectPtr<UInputAction> IA_SteerLeft;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MZ|Input")
+	TObjectPtr<UInputAction> IA_SteerRight;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MZ|Input")
 	TObjectPtr<UInputAction> IA_Handbrake;
@@ -125,6 +161,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MZ|Input")
 	TObjectPtr<UInputAction> IA_Look;
 
+	UPROPERTY(EditDefaultsOnly, Category = "MZ|Input")
+	TObjectPtr<UInputAction> IA_ExitVehicle;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MZ|Input")
+	TObjectPtr<UInputAction> IA_RadioNext;
+
 	// Runtime-created mapping context (used when no editor assets exist)
 	UPROPERTY()
 	TObjectPtr<UInputMappingContext> BootstrappedMappingContext;
@@ -134,11 +176,19 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MZ|Vehicle")
 	TObjectPtr<UMZVehicleDataAsset> VehicleData;
 
+	// --- Driver exit ---
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MZ|Vehicle")
+	FVector ExitOffset = FVector(0.0f, -250.0f, 50.0f);
+
 private:
 	// Input handlers
 	void HandleThrottle(const FInputActionValue& Value);
 	void HandleBrake(const FInputActionValue& Value);
-	void HandleSteering(const FInputActionValue& Value);
+	void HandleSteerLeft(const FInputActionValue& Value);
+	void HandleSteerLeftReleased(const FInputActionValue& Value);
+	void HandleSteerRight(const FInputActionValue& Value);
+	void HandleSteerRightReleased(const FInputActionValue& Value);
 	void HandleHandbrake(const FInputActionValue& Value);
 	void HandleHandbrakeReleased(const FInputActionValue& Value);
 	void HandleShiftUp();
@@ -146,6 +196,8 @@ private:
 	void HandleCameraCycle();
 	void HandleResetVehicle();
 	void HandleLook(const FInputActionValue& Value);
+	void HandleExitVehicle();
+	void HandleRadioNext();
 
 	// Bootstrap input if no editor assets assigned
 	void BootstrapDefaultInput();
@@ -167,6 +219,8 @@ private:
 	float CachedThrottle = 0.0f;
 	float CachedBrake = 0.0f;
 	float CachedSteering = 0.0f;
+	bool bSteerLeftHeld = false;
+	bool bSteerRightHeld = false;
 
 	// Spawn transform for reset
 	FTransform SpawnTransform;

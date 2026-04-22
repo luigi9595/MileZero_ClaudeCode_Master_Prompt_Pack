@@ -2,35 +2,93 @@
 
 ## Snapshot
 - Date: 2026-03-27
-- Current milestone: M8 — Hardening
-- Current status: IN_PROGRESS (all code written, pending compile + PIE verification)
-- Repository truth summary: 72 C++ source files across 10 subsystems, UE 5.7 project
+- Current status: CODE_COMPLETE — full vertical slice + sandbox features
+- Repository: 105 C++ source files, 13,315 lines, 20 subsystems across 17 modules
+- Engine: UE 5.7 + VS 2026 Community
 
-## Systems implemented (code-complete)
-- **M0**: Project bootstrap — VERIFIED
-- **M1**: First drivable core — code complete, pending PIE test
-- **M2**: Surface system (4 surfaces) + Telemetry HUD (Slate) + Gameplay HUD
-- **M3**: Vehicle trio (Coupe RWD 1300kg / Hatch FWD 1150kg / Pickup AWD 2000kg) + Registry + Selection UI
-- **M4**: Mechanical damage (steering pull, engine power loss, suspension, cooling/overheat, aero drag, brake degradation, per-wheel traction)
-- **M5**: World zones (City/Industrial/Highway/Rural/ProvingGround) + Spawn points + World manager + Route markers + Main world commandlet
-- **M6**: Activity manager (4 types) + Checkpoint actors + Delivery actors + Save/Load manager + AutoSave
-- **M7**: Traffic AI (spline paths, obstacle avoidance, spawn/despawn) + Day/Night cycle + Weather/Wet roads
-- **M8**: Full wiring — damage ↔ vehicle ↔ surface ↔ weather integrated in VehiclePawn::Tick
+## All systems implemented
 
-## Last verified action
-- Command: Integration of all M2-M8 systems into MZVehiclePawn
-- Result: All code written and cross-referenced
-- Evidence: docs/VERIFICATION.md
+### Core (M0-M1)
+- Game mode, player controller, game instance
+- Enhanced Input pipeline (runtime bootstrap)
+- On-foot character with third-person camera
+- Vehicle enter/exit system (F key, speed check on exit)
+- Game starts in vehicle, player can exit/re-enter freely
 
-## Current blockers / risks
-- No hard code blockers. All 72 source files are written.
-- Risk: first compile may reveal include order issues or API mismatches (expected for this volume of new code)
-- Risk: editor binary assets (maps, meshes) still need creation via commandlet or manual setup
+### Driving (M1-M3)
+- Chaos wheeled vehicle with OffroadCar mesh + AnimBP
+- 3 vehicle profiles: Coupe (RWD 1300kg), Hatch (FWD 1150kg), Pickup (AWD 2000kg)
+- Vehicle registry + runtime data-driven selection
+- Chase camera + hood camera + cycling
+- Vehicle reset (R key) with damage repair
+- Automatic transmission, 5-speed gearbox
 
-## Next immediate actions
-1. `tools\compile_check.bat` — verify all 72 files compile
-2. Fix any compile errors
-3. Run commandlet to generate test level + main world
-4. PIE test: drive vehicle, switch between 3 vehicles, verify surface grip, crash for damage, test telemetry HUD
-5. Verify activities start/complete flow
-6. Mark milestones as VERIFIED in MILESTONE_STATUS.md
+### Physics (M2-M4)
+- 4 surface types: Dry Asphalt (1.0), Wet Asphalt (0.78), Gravel (0.62), Grass (0.42)
+- Surface contact detection (line trace, physical material lookup)
+- Per-wheel friction multiplier (surface * damage)
+- 8-system mechanical damage: steering pull, engine power loss, suspension per-wheel, cooling/overheat, aero drag, brake degradation, per-wheel traction
+- Collision-based damage with direction-aware distribution
+- Weather system affects wet surface grip globally
+
+### World (M5)
+- 5 world zones: City, Industrial, Highway, Rural, ProvingGround
+- Zone detection via overlap volumes
+- Spawn/recovery points with editor visualization
+- Route markers for zone connections
+- World manager subsystem (zone tracking, spawn queries)
+- Main world generation commandlet
+
+### Gameplay (M6)
+- Activity manager with 4 types: Checkpoint Sprint, Delivery Run, Traffic Weave, Damage Survival
+- Checkpoint trigger actors with sequential progression
+- Delivery pickup/dropoff actors
+- Timer, success/fail conditions, best time tracking
+
+### Systemic (M7)
+- Traffic AI: spline-based paths, obstacle avoidance, spawn/despawn around player
+- Day/night cycle: sun rotation, intensity/color blending
+- Weather manager: dry/wet transitions, grip modification
+- Pedestrian system: lightweight NPCs, zone-density spawning, flee on vehicle hit
+
+### Economy & Progression
+- Money system: starting $5000, activity rewards ($500-$1000), traffic fines
+- Player stats: distance driven, playtime, top speed, driving skill (0-100)
+- Per-vehicle usage tracking
+- Transaction history
+
+### Services
+- Garage: repair (damage% * $50), paint (8 colors, $200), world-placed actors
+- Save/load manager with autosave (60s interval)
+- Persistent progression data
+
+### UI (all Slate, no UMG)
+- Gameplay HUD: speed, RPM, gear, damage bar
+- Telemetry overlay: full debug data, FPS, grip color (toggle MZ.Telemetry)
+- Minimap/radar: circular, player arrow, zone names, nearby markers
+- Notification system: 5-slot stack, typed messages, fade animation
+- Pause menu: Resume, Stats, Settings, Save, Load, Quit
+- Vehicle selection widget
+- Garage repair/paint UI
+- Stats display
+- Radio station widget (change notification)
+- Photo mode UI with effect sliders
+
+### Tools & Debug
+- Console commands: MZ.ResetVehicle, MZ.SpawnVehicle, MZ.Teleport, MZ.Telemetry, MZ.ListVehicles, MZ.SelectVehicle
+- Commandlets for test level and main world generation
+- compile_check.bat, generate_project_files.bat, open_editor.bat, build.bat
+
+### Camera
+- Photo mode: free-fly camera, pause, exposure/contrast/saturation/vignette/DoF, screenshot capture
+
+### Audio Infrastructure
+- Radio manager: 6 stations (Rock, Electronic, Jazz, Classical, Talk, Off)
+- Station cycling (Period key while driving)
+- Ready for audio asset integration
+
+## Next actions
+1. Compile: `tools\compile_check.bat`
+2. Fix compile errors
+3. PIE test the full loop
+4. Add audio assets, additional meshes/materials

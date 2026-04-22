@@ -1,8 +1,12 @@
 #include "MZCharacter.h"
 #include "MileZero.h"
+#include "MileZero/Vehicles/MZVehiclePawn.h"
+#include "MileZero/Core/MZPlayerController.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/SphereComponent.h"
+#include "Engine/CollisionProfile.h"
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 
@@ -20,6 +24,15 @@ AMZCharacter::AMZCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 
+	// Vehicle detection sphere
+	VehicleDetectionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("VehicleDetectionSphere"));
+	VehicleDetectionSphere->SetupAttachment(RootComponent);
+	VehicleDetectionSphere->SetSphereRadius(300.0f);
+	VehicleDetectionSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	VehicleDetectionSphere->SetCollisionObjectType(ECC_Pawn);
+	VehicleDetectionSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
+	VehicleDetectionSphere->SetCollisionResponseToChannel(ECC_Vehicle, ECR_Overlap);
+
 	// Movement defaults
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -33,6 +46,14 @@ AMZCharacter::AMZCharacter()
 void AMZCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Bind vehicle detection sphere events
+	if (VehicleDetectionSphere)
+	{
+		VehicleDetectionSphere->OnComponentBeginOverlap.AddDynamic(this, &AMZCharacter::OnVehicleDetectionOverlapBegin);
+		VehicleDetectionSphere->OnComponentEndOverlap.AddDynamic(this, &AMZCharacter::OnVehicleDetectionOverlapEnd);
+	}
+
 	UE_LOG(LogMileZero, Log, TEXT("MZCharacter spawned"));
 }
 
@@ -85,6 +106,48 @@ void AMZCharacter::HandleJump()
 
 void AMZCharacter::HandleInteract()
 {
-	// Post-M1: trace for nearest vehicle and request enter
-	UE_LOG(LogMileZero, Log, TEXT("Interact — vehicle enter/exit wired post-M1"));
+	if (NearbyVehicle)
+	{
+		EnterVehicle();
+	}
+}
+
+void AMZCharacter::EnterVehicle()
+{
+	if (!NearbyVehicle)
+	{
+		UE_LOG(LogMileZero, Warning, TEXT("No nearby vehicle to enter"));
+		return;
+	}
+
+	AMZPlayerController* PC = Cast<AMZPlayerController>(GetController());
+	if (!PC)
+	{
+		UE_LOG(LogMileZero, Warning, TEXT("No player controller"));
+		return;
+	}
+
+	PC->RequestEnterVehicle();
+}
+
+void AMZCharacter::OnVehicleDetectionOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	AMZVehiclePawn* Vehicle = Cast<AMZVehiclePawn>(OtherActor);
+	if (Vehicle)
+	{
+		NearbyVehicle = Vehicle;
+		UE_LOG(LogMileZero, Log, TEXT("Vehicle detected nearby: %s"), *Vehicle->GetName());
+	}
+}
+
+void AMZCharacter::OnVehicleDetectionOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	AMZVehiclePawn* Vehicle = Cast<AMZVehiclePawn>(OtherActor);
+	if (Vehicle && NearbyVehicle == Vehicle)
+	{
+		NearbyVehicle = nullptr;
+		UE_LOG(LogMileZero, Log, TEXT("Vehicle left detection range"));
+	}
 }
